@@ -496,6 +496,9 @@ const HeapRegionTagged_t *pxHeapRegion;
 	/* Can only call once! */
 	configASSERT( pxEnd == NULL );
 
+	void rtthread_startup(void);
+	rtthread_startup();
+
 	vPortCPUInitializeMutex(&xMallocMutex);
 
 	pxHeapRegion = &( pxHeapRegions[ xRegIdx ] );
