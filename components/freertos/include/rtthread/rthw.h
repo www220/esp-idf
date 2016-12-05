@@ -46,7 +46,8 @@ rt_base_t rt_hw_cpu_dcache_status(void);
 void rt_hw_cpu_reset(void);
 void rt_hw_cpu_shutdown(void);
 
-rt_uint8_t *rt_hw_stack_init(void       *entry,
+rt_uint8_t *rt_hw_stack_init(rt_thread_t thread,
+                             void       *entry,
                              void       *parameter,
                              rt_uint8_t *stack_addr,
                              void       *exit);

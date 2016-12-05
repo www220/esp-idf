@@ -182,6 +182,10 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stdout = fopen(default_uart_dev, "w");
     _GLOBAL_REENT->_stderr = fopen(default_uart_dev, "w");
     do_global_ctors();
+    
+    void rtthread_startup(void);
+    rtthread_startup();
+
 #if !CONFIG_FREERTOS_UNICORE
     esp_crosscore_int_init();
 #endif

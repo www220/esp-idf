@@ -493,6 +493,11 @@ struct rt_thread
 
     /* stack point and entry */
     void       *sp;                                     /**< stack point */
+
+    xMPU_SETTINGS xMPUSettings;                         /**< MPU settings */
+    BaseType_t    xCoreID;                              /**< coreid */
+    struct _reent xNewLib_reent;                        /**< reent */
+
     void       *entry;                                  /**< entry */
     void       *parameter;                              /**< parameter */
     void       *stack_addr;                             /**< stack address */

@@ -180,6 +180,14 @@ static void rt_thread_idle_entry(void *parameter)
     while (1)
     {
         RT_OBJECT_HOOK_CALL(rt_thread_idle_hook,());
+
+#if ( configUSE_IDLE_HOOK == 1 )
+        extern void vApplicationIdleHook( void );
+        vApplicationIdleHook();
+#endif /* configUSE_IDLE_HOOK */
+        extern void esp_vApplicationIdleHook( void );
+        esp_vApplicationIdleHook();
+
         rt_thread_idle_excute();
     }
 }

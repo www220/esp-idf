@@ -10,16 +10,17 @@
 #include "freertos/xtensa_rtos.h"
 
 /* RT_NAME_MAX*/
-#define RT_NAME_MAX	8
+#define RT_NAME_MAX	16
 
 /* RT_ALIGN_SIZE*/
-#define RT_ALIGN_SIZE	8
+#define RT_ALIGN_SIZE	4
 
 /* PRIORITY_MAX */
 #define RT_THREAD_PRIORITY_MAX	32
 
 /* Tick per Second */
 #define RT_TICK_PER_SECOND	100
+#define IDLE_THREAD_STACK_SIZE 2048
 
 /* Using Software Timer */
 #define RT_USING_TIMER_SOFT
@@ -45,7 +46,6 @@
 /* Using Dynamic Heap Management */
 #define RT_USING_HEAP
 
-/* SECTION: Device System */
 /* Using Device System */
 #define RT_USING_DEVICE
 #define RT_USING_DEVICE_IPC
@@ -70,8 +70,5 @@
 #define FINSH_USING_SYMTAB
 #define FINSH_USING_DESCRIPTION
 #define FINSH_THREAD_STACK_SIZE	2048
-
-#define IDLE_THREAD_STACK_SIZE 2048
-#define RT_DEBUG_TIMER 0
 
 #endif
