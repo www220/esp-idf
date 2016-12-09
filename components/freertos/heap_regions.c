@@ -179,6 +179,7 @@ static BlockLink_t xStart, *pxEnd = NULL;
 
 /* Keeps track of the number of free bytes remaining, but says nothing about
 fragmentation. */
+static size_t xTotalHeapSize = 0;
 static size_t xFreeBytesRemaining = 0;
 static size_t xMinimumEverFreeBytesRemaining = 0;
 
@@ -488,7 +489,7 @@ void vPortDefineHeapRegionsTagged( const HeapRegionTagged_t * const pxHeapRegion
 {
 BlockLink_t *pxFirstFreeBlockInRegion = NULL, *pxPreviousFreeBlock;
 uint8_t *pucAlignedHeap;
-size_t xTotalRegionSize, xTotalHeapSize = 0;
+size_t xTotalRegionSize;
 BaseType_t xDefinedRegions = 0, xRegIdx = 0;
 uint32_t ulAddress;
 const HeapRegionTagged_t *pxHeapRegion;
@@ -603,3 +604,10 @@ const HeapRegionTagged_t *pxHeapRegion;
         #endif
 }
 
+#include <rtthread.h>
+void list_mem(void)
+{
+    rt_kprintf("total memory: %d\n", xTotalHeapSize);
+    rt_kprintf("used memory : %d\n", xTotalHeapSize-xFreeBytesRemaining);
+    rt_kprintf("maximum allocated memory: %d\n", xTotalHeapSize-xMinimumEverFreeBytesRemaining);
+}

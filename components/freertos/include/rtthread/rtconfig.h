@@ -20,7 +20,16 @@
 
 /* Tick per Second */
 #define RT_TICK_PER_SECOND	100
+
+/* SECTION: RT_DEBUG */
+/* Thread Debug */
+#define RT_DEBUG
+
+/* Using Hook */
+#define RT_USING_HOOK
+
 #define IDLE_THREAD_STACK_SIZE 2048
+//#define RT_USING_OVERFLOW_CHECK
 
 /* Using Software Timer */
 #define RT_USING_TIMER_SOFT
@@ -46,6 +55,7 @@
 /* Using Dynamic Heap Management */
 #define RT_USING_HEAP
 
+/* SECTION: Device System */
 /* Using Device System */
 #define RT_USING_DEVICE
 #define RT_USING_DEVICE_IPC

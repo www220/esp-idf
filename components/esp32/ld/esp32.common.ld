@@ -82,6 +82,18 @@ SECTIONS
     *librtc.a:(.literal .text .literal.* .text.*)
     *libpp.a:(.literal .text .literal.* .text.*)
     *libhal.a:(.literal .text .literal.* .text.*)
+
+    /* section information for finsh shell */
+    . = ALIGN(4);
+    __fsymtab_start = .;
+    KEEP(*(FSymTab))
+    __fsymtab_end = .;
+    . = ALIGN(4);
+    __vsymtab_start = .;
+    KEEP(*(VSymTab))
+    __vsymtab_end = .;
+    . = ALIGN(4); 
+
     _iram_text_end = ABSOLUTE(.);
   } > iram0_0_seg
 

@@ -524,6 +524,8 @@ char *rt_strncpy(char *dest, const char *src, rt_ubase_t n);
 void *rt_memmove(void *dest, const void *src, rt_ubase_t n);
 rt_int32_t rt_memcmp(const void *cs, const void *ct, rt_ubase_t count);
 rt_uint32_t rt_strcasecmp(const char *a, const char *b);
+char *rt_strcpy(char *dest, const char *src);
+char *rt_strcat(char *dest, const char *src);
 
 void rt_show_version(void);
 

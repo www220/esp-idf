@@ -422,6 +422,28 @@ char *rt_strncpy(char *dst, const char *src, rt_ubase_t n)
 }
 RTM_EXPORT(rt_strncpy);
 
+char *rt_strcpy(char *dst, const char *src)
+{
+    char *d = dst;
+
+    while ((*dst++ = *src++) != 0);
+
+    return d;
+}
+RTM_EXPORT(rt_strcpy);
+
+char *rt_strcat(char *dst, const char *src)
+{
+    char *d = dst;
+
+    while (*dst)
+        dst++;
+    while ((*dst++ = *src++) != 0);
+
+    return d;
+}
+RTM_EXPORT(rt_strcat);
+
 /**
  * This function will compare two strings with specified maximum length
  *

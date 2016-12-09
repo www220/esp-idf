@@ -120,6 +120,9 @@ void rt_thread_idle_excute(void)
             /* invoke thread cleanup */
             if (thread->cleanup != RT_NULL)
                 thread->cleanup(thread);
+            
+            extern void _reclaim_reent (struct _reent * reent);
+            _reclaim_reent(&(thread->xNewLib_reent));
 
             /* if it's a system object, not delete it */
             if (rt_object_is_systemobject((rt_object_t)thread) == RT_TRUE)

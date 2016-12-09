@@ -6,9 +6,9 @@
 #include "esp_newlib.h"
 #include <rtthread.h>
 
-#define SHOW_TSK_DEBUG_INFO
-#define SHOW_QUE_DEBUG_INFO
-#define SHOW_TIM_DEBUG_INFO
+//#define SHOW_TSK_DEBUG_INFO
+//#define SHOW_QUE_DEBUG_INFO
+//#define SHOW_TIM_DEBUG_INFO
 
 portSTACK_TYPE * volatile pxCurrentTCB[ portNUM_PROCESSORS ] = { NULL };
 portSTACK_TYPE * volatile pxSaveTCB[ portNUM_PROCESSORS ] = { NULL };
@@ -102,13 +102,15 @@ BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const
     rt_thread_t thread = rt_thread_create((const char *)pcName,pxTaskCode,pvParameters,usStackDepth,configMAX_PRIORITIES+2-uxPriority,10);
     if (thread != NULL)
     {
-#ifdef SHOW_TSK_DEBUG_INFO
-        ets_printf("TaskCreate name:%s pri:%d size:%d\n",pcName,(configMAX_PRIORITIES+2-uxPriority),usStackDepth);
-#endif
         rt_thread_startup(thread);
         xReturn = pdPASS;
     }
     if (pxCreatedTask) *pxCreatedTask = thread;
+#ifdef SHOW_TSK_DEBUG_INFO
+    ets_printf("TaskCreate cur:%s name:%s pri:%d size:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                pcName,(configMAX_PRIORITIES+2-uxPriority),usStackDepth);
+#endif
     return xReturn;
 }
 void vTaskDelete(xTaskHandle xTaskToDelete)
@@ -117,7 +119,9 @@ void vTaskDelete(xTaskHandle xTaskToDelete)
     if (thread == NULL)
         thread = rt_current_thread;
 #ifdef SHOW_TSK_DEBUG_INFO
-    ets_printf("TaskDelete name:%s\n",thread->name);
+    ets_printf("TaskDelete cur:%s name:%s\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                thread->name);
 #endif
     rt_thread_delete(thread);
     rt_schedule();
@@ -175,10 +179,23 @@ BaseType_t xTaskResumeAll( void )
         rt_exit_critical();
     return pdTRUE;
 }
+BaseType_t xTaskIncrementTick( void )
+{ 
+#if ( configUSE_TICK_HOOK == 1 )
+    extern void vApplicationTickHook( void );
+    vApplicationTickHook();
+#endif /* configUSE_TICK_HOOK */
+    extern void esp_vApplicationTickHook( void );
+    esp_vApplicationTickHook();
+
+    rt_interrupt_enter();
+    rt_tick_increase();
+    rt_interrupt_leave();
+    return pdFALSE;
+}
 TickType_t xTaskGetTickCount( void ) { return rt_tick_get(); }
 void vTaskStartScheduler(void) { rt_system_scheduler_start();xSchedulerRunning=pdTRUE;xPortStartScheduler(); }
 void vTaskDelay( const TickType_t xTicksToDelay ) { rt_thread_delay(xTicksToDelay); }
-BaseType_t xTaskIncrementTick( void ) { rt_interrupt_enter();rt_tick_increase();rt_interrupt_leave();return pdFALSE; }
 TaskHandle_t xTaskGetCurrentTaskHandle( void ) { return rt_current_thread; }
 BaseType_t xTaskGetAffinity( TaskHandle_t xTask ) { return RTT_USING_CPUID; }
 char *pcTaskGetTaskName( TaskHandle_t xTaskToQuery ) { rt_thread_t thread=xTaskToQuery;return thread->name; }
@@ -218,7 +235,9 @@ QueueHandle_t xQueueGenericCreate( const UBaseType_t uxQueueLength, const UBaseT
         obj = (rt_object_t)rt_fmq_create(name,uxItemSize,uxQueueLength,RT_IPC_FLAG_PRIO);
     }
 #ifdef SHOW_QUE_DEBUG_INFO
-    ets_printf("QueueCreate name:%s count:%d size:%d type:%d\n",name,uxQueueLength,uxItemSize,ucQueueType);
+    ets_printf("QueueCreate cur:%s name:%s count:%d size:%d type:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                name,uxQueueLength,uxItemSize,ucQueueType);
 #endif
     return obj;
 }
@@ -226,7 +245,9 @@ void vQueueDelete( QueueHandle_t xQueue )
 {
     rt_object_t obj = xQueue;
 #ifdef SHOW_QUE_DEBUG_INFO
-    ets_printf("QueueDelete name:%s\n",obj->name);
+    ets_printf("QueueDelete cur:%s name:%s\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->name);
 #endif
     if (obj->type == RT_Object_Class_Semaphore)
         rt_sem_delete((rt_sem_t)obj);
