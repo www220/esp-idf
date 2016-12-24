@@ -28,6 +28,8 @@
 #include "soc/rtc_cntl_reg.h"
 #include "soc/timer_group_reg.h"
 
+#include "driver/rtc_io.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -174,12 +176,7 @@ void start_cpu0_default(void)
 #if CONFIG_BROWNOUT_DET
     esp_brownout_init();
 #endif
-#if CONFIG_INT_WDT
-    esp_int_wdt_init();
-#endif
-#if CONFIG_TASK_WDT
-    esp_task_wdt_init();
-#endif
+    rtc_gpio_unhold_all();
     esp_setup_time_syscalls();
     esp_vfs_dev_uart_register();
     esp_reent_init(_GLOBAL_REENT);
@@ -194,10 +191,16 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
     do_global_ctors();
-    
+#if 1
     void rtthread_startup(void);
     rtthread_startup();
-
+#endif
+#if CONFIG_INT_WDT
+    esp_int_wdt_init();
+#endif
+#if CONFIG_TASK_WDT
+    esp_task_wdt_init();
+#endif
 #if !CONFIG_FREERTOS_UNICORE
     esp_crosscore_int_init();
 #endif
@@ -232,8 +235,11 @@ void start_cpu1_default(void)
     while (port_xSchedulerRunning[0] == 0) {
         ;
     }
+    //Take care putting stuff here: if asked, FreeRTOS will happily tell you the scheduler
+    //has started, but it isn't active *on this CPU* yet.
     esp_crosscore_int_init();
-    ESP_LOGI(TAG, "Starting scheduler on APP CPU.");
+
+    ESP_EARLY_LOGI(TAG, "Starting scheduler on APP CPU.");
     xPortStartScheduler();
 }
 #endif //!CONFIG_FREERTOS_UNICORE

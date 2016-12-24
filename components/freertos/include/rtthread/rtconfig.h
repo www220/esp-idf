@@ -81,4 +81,8 @@
 #define FINSH_USING_DESCRIPTION
 #define FINSH_THREAD_STACK_SIZE	2048
 
+/* SECTION: a runtime libc library */
+/* a runtime libc library */
+#define RT_USING_NEWLIB
+
 #endif

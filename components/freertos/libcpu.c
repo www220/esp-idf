@@ -92,14 +92,22 @@ void rt_free(void *ptr) { vPortFree(ptr); }
 BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const pcName, const uint16_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask, const BaseType_t xCoreID )
 {
     BaseType_t xRunPrivileged;
+	uint16_t usStackDepthC;
     if((uxPriority & portPRIVILEGE_BIT) != 0U)
         xRunPrivileged = pdTRUE;
     else
         xRunPrivileged = pdFALSE;
     uxPriority &= ~portPRIVILEGE_BIT;
     (void)(xRunPrivileged);
+
+#if (configMAX_PRIORITIES) > (25)
+	#pragma errno ("configMAX_PRIORITIES must <= 25")
+#endif
+	uxPriority = RT_THREAD_PRIORITY_MAX-5-uxPriority;
+	usStackDepthC = usStackDepth*sizeof(StackType_t);	
+	
     BaseType_t xReturn = errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY;
-    rt_thread_t thread = rt_thread_create((const char *)pcName,pxTaskCode,pvParameters,usStackDepth,configMAX_PRIORITIES+2-uxPriority,10);
+    rt_thread_t thread = rt_thread_create((const char *)pcName,pxTaskCode,pvParameters,usStackDepthC,uxPriority,10);
     if (thread != NULL)
     {
         rt_thread_startup(thread);
@@ -109,7 +117,7 @@ BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const
 #ifdef SHOW_TSK_DEBUG_INFO
     ets_printf("TaskCreate cur:%s name:%s pri:%d size:%d\n",
                 (rt_current_thread)?(rt_current_thread->name):("NULL"),
-                pcName,(configMAX_PRIORITIES+2-uxPriority),usStackDepth);
+                pcName,uxPriority,usStackDepthC);
 #endif
     return xReturn;
 }
@@ -134,7 +142,6 @@ void vTaskSwitchContext( void )
         pxSaveTCB[RTT_USING_CPUID] = NULL;
         return;
     }
-    ets_printf("TaskSwitchContext pxSaveTCB==NULL\n");
     rt_schedule();
 }
 TaskHandle_t xTaskGetCurrentTaskHandleForCPU( BaseType_t cpuid )
@@ -358,20 +365,69 @@ UBaseType_t uxQueueMessagesWaiting( const QueueHandle_t xQueue )
         count = ((rt_mailbox_t)obj)->entry;
     return count;
 }
-UBaseType_t uxQueueMessagesWaitingFromISR( const QueueHandle_t xQueue )
-{ 
-    rt_object_t obj = xQueue;
-    unsigned portBASE_TYPE count = 0;
-    if (obj->type == RT_Object_Class_Semaphore)
-        count = ((rt_sem_t)obj)->value;
-    else if (obj->type == RT_Object_Class_Mutex)
-        count = ((rt_mutex_t)obj)->value;
-    else
-        count = ((rt_mailbox_t)obj)->entry;
-    return count;
-}
+UBaseType_t uxQueueMessagesWaitingFromISR( const QueueHandle_t xQueue ) { return uxQueueMessagesWaiting(xQueue); }
 QueueHandle_t xQueueCreateMutex( const uint8_t ucQueueType ) { return xQueueGenericCreate(1,0,ucQueueType); }
 BaseType_t xQueueTakeMutexRecursive( QueueHandle_t xMutex, TickType_t xTicksToWait ) { return xQueueGenericReceive(xMutex,0,xTicksToWait,pdFALSE); }
 BaseType_t xQueueGiveMutexRecursive( QueueHandle_t xMutex ) { return xQueueGenericSend(xMutex,0,0,queueSEND_TO_BACK); }
 BaseType_t xQueueGiveFromISR( QueueHandle_t xQueue, BaseType_t * const pxHigherPriorityTaskWoken ) { return xQueueGenericSendFromISR(xQueue,0,pxHigherPriorityTaskWoken,queueSEND_TO_BACK); }
 void* xQueueGetMutexHolder( QueueHandle_t xSemaphore ) { return NULL; }
+
+TimerHandle_t xTimerCreate( const char * const pcTimerName, const TickType_t xTimerPeriodInTicks, const UBaseType_t uxAutoReload, void * const pvTimerID, TimerCallbackFunction_t pxCallbackFunction )
+{
+    char name[10] = {0}, *tname = (char *)pcTimerName;
+    rt_timer_t obj = 0;
+    if (pcTimerName == NULL)
+    {
+        sprintf(name,"tim%02d",((++tm_index)%100));
+        tname = name;
+    }
+    if (xTimerPeriodInTicks > 0)
+    {
+        rt_uint8_t flag = (uxAutoReload == pdTRUE)?(RT_TIMER_FLAG_PERIODIC):(RT_TIMER_FLAG_ONE_SHOT);
+        obj = rt_timer_create(tname,pxCallbackFunction,pvTimerID,xTimerPeriodInTicks,flag);
+    }
+#ifdef SHOW_TIM_DEBUG_INFO
+    ets_printf("xTimerCreate cur:%s name:%s tick:%d auto:%d id:%x func:%x\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                tname,xTimerPeriodInTicks,uxAutoReload,pvTimerID,pxCallbackFunction);
+#endif
+    return obj;
+}
+BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommandID, const TickType_t xOptionalValue, BaseType_t * const pxHigherPriorityTaskWoken, const TickType_t xTicksToWait )
+{
+    rt_timer_t obj = xTimer;
+    if (pxHigherPriorityTaskWoken)
+        rt_interrupt_enter();
+#ifdef SHOW_TIM_DEBUG_INFO
+    ets_printf("xTimerCommand cur:%s name:%s cmd:%d val:%d tim:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->parent.name,xCommandID,xOptionalValue,xBlockTime);
+#endif
+    rt_err_t err = RT_EOK;
+    switch(xCommandID)
+    {
+    case tmrCOMMAND_START:
+        err = rt_timer_start(obj);
+        break;
+    case tmrCOMMAND_STOP:
+        err = rt_timer_stop(obj);
+        break;
+    case tmrCOMMAND_CHANGE_PERIOD:{
+        rt_tick_t tick = xOptionalValue;
+        err = rt_timer_control(obj,RT_TIMER_CTRL_SET_TIME,&tick);
+        break;}
+    case tmrCOMMAND_DELETE:
+        err = rt_timer_delete(obj);
+        break;
+    }
+#ifdef SHOW_TIM_DEBUG_INFO
+    ets_printf("xTimerCommandOver cur:%s name:%s ret:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->parent.name,err);
+#endif
+    if (pxHigherPriorityTaskWoken) {
+        *pxHigherPriorityTaskWoken = pdFAIL;
+        rt_interrupt_leave();
+    }
+    return (err==RT_EOK)?pdPASS:pdFAIL;
+}
