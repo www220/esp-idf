@@ -57,9 +57,6 @@
 #define IFNAME1 'n'
 
 static char hostname[16];
-#if ESP_PERF
-uint32_t g_rx_alloc_pbuf_fail_cnt = 0;
-#endif
 
 /**
  * In this function, the hardware should be initialized.
@@ -176,7 +173,8 @@ wlanif_input(struct netif *netif, void *buffer, u16_t len, void* eb)
     return;
   }
   p->payload = buffer;
-  p->eb = eb;
+  p->user_buf = eb;
+  p->user_flag = PBUF_USER_FLAG_OWNER_WIFI;
 #endif
 
   /* full packet send to tcpip_thread to process */
