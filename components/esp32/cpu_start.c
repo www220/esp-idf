@@ -55,6 +55,7 @@
 #include "esp_task_wdt.h"
 #include "esp_phy_init.h"
 #include "esp_coexist.h"
+#include "esp_core_dump.h"
 #include "trax.h"
 
 #define STRINGIFY(s) STRINGIFY2(s)
@@ -70,9 +71,11 @@ static bool app_cpu_started = false;
 #endif //!CONFIG_FREERTOS_UNICORE
 
 static void do_global_ctors(void);
-static void do_phy_init();
 static void main_task(void* args);
 extern void app_main(void);
+#if CONFIG_ESP32_PHY_AUTO_INIT
+static void do_phy_init();
+#endif
 
 extern int _bss_start;
 extern int _bss_end;
@@ -172,7 +175,9 @@ void start_cpu0_default(void)
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
 #endif
     esp_set_cpu_freq();     // set CPU frequency configured in menuconfig
+#ifndef CONFIG_CONSOLE_UART_NONE
     uart_div_modify(CONFIG_CONSOLE_UART_NUM, (APB_CLK_FREQ << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
+#endif
 #if CONFIG_BROWNOUT_DET
     esp_brownout_init();
 #endif
@@ -206,6 +211,8 @@ void start_cpu0_default(void)
 #endif
     esp_ipc_init();
     spi_flash_init();
+    /* init default OS-aware flash access critical section */
+    spi_flash_guard_set(&g_flash_guard_default_ops);
 
 #if CONFIG_ESP32_PHY_AUTO_INIT
     nvs_flash_init();
@@ -216,6 +223,10 @@ void start_cpu0_default(void)
     if (coex_init() == ESP_OK) {
         coexist_set_enable(true);
     }
+#endif
+
+#if CONFIG_ESP32_ENABLE_COREDUMP
+    esp_core_dump_init();
 #endif
 
     xTaskCreatePinnedToCore(&main_task, "main",
@@ -261,6 +272,7 @@ static void main_task(void* args)
     vTaskDelete(NULL);
 }
 
+#if CONFIG_ESP32_PHY_AUTO_INIT
 static void do_phy_init()
 {
     esp_phy_calibration_mode_t calibration_mode = PHY_RF_CAL_PARTIAL;
@@ -294,3 +306,5 @@ static void do_phy_init()
     esp_phy_release_init_data(init_data);
     free(cal_data); // PHY maintains a copy of calibration data, so we can free this
 }
+#endif //CONFIG_ESP32_PHY_AUTO_INIT
+
