@@ -15,6 +15,8 @@ portSTACK_TYPE * volatile pxSaveTCB[ portNUM_PROCESSORS ] = { NULL };
 
 #define RTT_USING_CPUID 0
 extern rt_thread_t rt_current_thread;
+extern void rt_hw_board_init();
+
 static volatile unsigned short mq_index = 0;
 static volatile unsigned short ms_index = 0;
 static volatile unsigned short mx_index = 0;
@@ -56,6 +58,13 @@ void rtthread_startup(void)
 {
     /* disbable interrupt */
     rt_hw_interrupt_disable();
+
+    /* init board */
+    rt_hw_board_init();
+
+    /* show version */
+	rt_kprintf("\n\n");
+    rt_show_version();
 
     /* init tick */
     rt_system_tick_init();

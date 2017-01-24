@@ -25,6 +25,14 @@
 #ifndef __USER_CONFIG_H__
 #define __USER_CONFIG_H__
 
+#include "driver/periph_ctrl.h"
+#include "driver/rtc_io.h"
+#include "driver/gpio.h"
+
+#define RT_USING_UART0
+#define RT_USING_UART1
+#define RT_USING_UART2
+
 #define CONSOLE_DEVICE "uart0"
 #define FINSH_DEVICE_NAME "uart0"
 

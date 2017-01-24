@@ -19,7 +19,12 @@
 #define RT_THREAD_PRIORITY_MAX	32
 
 /* Tick per Second */
-#define RT_TICK_PER_SECOND	100
+#define RT_TICK_PER_SECOND	1000
+#if RT_TICK_PER_SECOND == 1000
+#define M2T(x) (x)
+#else
+#define M2T(x) (((x)*RT_TICK_PER_SECOND+999)/1000)
+#endif
 
 /* SECTION: RT_DEBUG */
 /* Thread Debug */

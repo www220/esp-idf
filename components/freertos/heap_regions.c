@@ -561,6 +561,10 @@ const HeapRegionTagged_t *pxHeapRegion;
         }
 
         xTotalHeapSize += pxFirstFreeBlockInRegion->xBlockSize;
+#if 1
+		if (pxHeapRegion->xTag == 0 || pxHeapRegion->xTag == 1 || pxHeapRegion->xTag == 15)
+			xTotalHeapSizeAll += pxFirstFreeBlockInRegion->xBlockSize;
+#endif
         xMinimumEverFreeBytesRemaining[ pxHeapRegion->xTag ] += pxFirstFreeBlockInRegion->xBlockSize;
         xFreeBytesRemaining[ pxHeapRegion->xTag ] += pxFirstFreeBlockInRegion->xBlockSize;
 
@@ -579,7 +583,6 @@ const HeapRegionTagged_t *pxHeapRegion;
 
     /* Check something was actually defined before it is accessed. */
     configASSERT( xTotalHeapSize );
-    xTotalHeapSizeAll = xTotalHeapSize;
 
 
         #if (configENABLE_MEMORY_DEBUG == 1)
@@ -589,20 +592,13 @@ const HeapRegionTagged_t *pxHeapRegion;
         }
         #endif
 }
+
 #if 1
 #include <rtthread.h>
 void list_mem(void)
 {
-    int i;
-    size_t xFreeBytesRemainingAll = 0;
-    size_t xMinimumEverFreeBytesRemainingAll = 0;
-    for (i=0; i<HEAPREGIONS_MAX_TAGCOUNT; i++)
-    {
-        xFreeBytesRemainingAll += xFreeBytesRemaining[i];
-        xMinimumEverFreeBytesRemainingAll += xMinimumEverFreeBytesRemaining[i];
-    }
     rt_kprintf("total memory: %d\n", xTotalHeapSizeAll);
-    rt_kprintf("used memory : %d\n", xTotalHeapSizeAll-xFreeBytesRemainingAll);
-    rt_kprintf("maximum allocated memory: %d\n", xTotalHeapSizeAll-xMinimumEverFreeBytesRemainingAll);
+    rt_kprintf("used memory : %d\n", xTotalHeapSizeAll-xPortGetFreeHeapSize());
+    rt_kprintf("maximum allocated memory: %d\n", xTotalHeapSizeAll-xPortGetMinimumEverFreeHeapSize());
 }
 #endif

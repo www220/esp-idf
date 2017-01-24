@@ -197,7 +197,7 @@ void start_cpu0_default(void)
 #endif
     do_global_ctors();
 #if 1
-    void rtthread_startup(void);
+    extern void rtthread_startup(void);
     rtthread_startup();
 #endif
 #if CONFIG_INT_WDT
