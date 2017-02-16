@@ -225,6 +225,7 @@ static void emac_set_user_config_data(eth_config_t *config )
     emac_config.emac_flow_ctrl_enable = false;
 #endif
     emac_config.emac_phy_get_partner_pause_enable = config->phy_get_partner_pause_enable;
+    emac_config.emac_phy_power_enable = config->phy_power_enable;
 }
 
 static void emac_enable_intr()
@@ -288,6 +289,11 @@ static esp_err_t emac_verify_args(void)
 
     if (emac_config.emac_flow_ctrl_enable == true && emac_config.emac_phy_get_partner_pause_enable == NULL) {
         ESP_LOGE(TAG, "phy get partner pause enable func is null");
+        ret = ESP_FAIL;
+    }
+
+    if(emac_config.emac_phy_power_enable == NULL) {
+        ESP_LOGE(TAG, "phy power enable func is null");
         ret = ESP_FAIL;
     }
 
@@ -537,6 +543,10 @@ static void emac_check_phy_init(void)
     } else {
         REG_CLR_BIT(EMAC_GMACCONFIG_REG, EMAC_GMACFESPEED);
     }
+#if CONFIG_EMAC_L2_TO_L3_RX_BUF_MODE
+    emac_disable_flowctrl();
+    emac_config.emac_flow_ctrl_partner_support = false;
+#else
     if (emac_config.emac_flow_ctrl_enable == true) {
         if (emac_config.emac_phy_get_partner_pause_enable() == true && emac_config.emac_phy_get_duplex_mode() == ETH_MDOE_FULLDUPLEX) {
             emac_enable_flowctrl();
@@ -549,6 +559,7 @@ static void emac_check_phy_init(void)
         emac_disable_flowctrl();
         emac_config.emac_flow_ctrl_partner_support = false;
     }
+#endif
     emac_mac_enable_txrx();
 }
 static void emac_process_link_updown(bool link_status)
@@ -937,6 +948,8 @@ esp_err_t esp_eth_init(eth_config_t *config)
     if (config != NULL ) {
         emac_set_user_config_data(config);
     }
+
+    emac_config.emac_phy_power_enable(true);    
 
     ret = emac_verify_args();
 

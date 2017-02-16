@@ -307,16 +307,16 @@ void rt_hw_usart_init()
     UART[uart1.num]->conf0.txfifo_rst = 0;
 	
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_4)) rtc_gpio_deinit(GPIO_NUM_4);
-	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_2)) rtc_gpio_deinit(GPIO_NUM_2);
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_5)) rtc_gpio_deinit(GPIO_NUM_5);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_18)) rtc_gpio_deinit(GPIO_NUM_18);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_4], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_4, GPIO_PULLUP_ONLY);
 	gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
 	gpio_matrix_out(GPIO_NUM_4, U1TXD_OUT_IDX, 0, 0);
-	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_2], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_2, GPIO_PULLUP_ONLY);
-	gpio_set_direction(GPIO_NUM_2, GPIO_MODE_INPUT);
-	gpio_matrix_in(GPIO_NUM_2, U1RXD_IN_IDX, 0);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_5], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_5, GPIO_PULLUP_ONLY);
+	gpio_set_direction(GPIO_NUM_5, GPIO_MODE_INPUT);
+	gpio_matrix_in(GPIO_NUM_5, U1RXD_IN_IDX, 0);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_18], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_18, GPIO_PULLUP_ONLY);
 	gpio_set_level(GPIO_NUM_18, 1);
@@ -395,6 +395,13 @@ void rt_hw_usart_init()
 
 void rt_hw_board_init(void)
 {
+	/* initialize gpio */
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_15)) rtc_gpio_deinit(GPIO_NUM_15);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_15], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_15, GPIO_PULLUP_ONLY);
+	gpio_set_level(GPIO_NUM_15, 1);
+	gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
+	gpio_matrix_out(GPIO_NUM_15, SIG_GPIO_OUT_IDX, 0, 0);
     /* initialize uart */
     rt_hw_usart_init();
 #ifdef RT_USING_CONSOLE
