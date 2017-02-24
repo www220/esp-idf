@@ -497,6 +497,8 @@ struct rt_thread
     xMPU_SETTINGS xMPUSettings;                         /**< MPU settings */
     BaseType_t    xCoreID;                              /**< coreid */
     struct _reent xNewLib_reent;                        /**< reent */
+    void *xtls[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
+    TlsDeleteCallbackFunction_t xtls_call[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
 
     void       *entry;                                  /**< entry */
     void       *parameter;                              /**< parameter */

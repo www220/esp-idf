@@ -151,6 +151,12 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
         esp_ble_gap_start_advertising(&test_adv_params);
         break;
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+        //advertising start complete event to indicate advertising start successfully or failed
+        if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+            ESP_LOGE(GATTS_TAG, "Advertising start failed\n");
+        }
+        break;
     default:
         break;
     }
@@ -394,6 +400,11 @@ void app_main()
 
     esp_bt_controller_init();
 
+    ret = esp_bt_controller_enable(ESP_BT_MODE_BTDM);
+    if (ret) {
+        ESP_LOGE(GATTS_TAG, "%s enable controller failed\n", __func__);
+        return;
+    }
     ret = esp_bluedroid_init();
     if (ret) {
         ESP_LOGE(GATTS_TAG, "%s init bluetooth failed\n", __func__);

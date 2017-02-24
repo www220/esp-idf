@@ -295,6 +295,12 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         esp_ble_gap_start_scanning(duration);
         break;
     }
+    case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
+        //scan start complete event to indicate scan start successfully or failed
+        if (param->scan_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+            ESP_LOGE(GATTC_TAG, "Scan start failed\n");
+        }
+        break;
     case ESP_GAP_BLE_SCAN_RESULT_EVT: {
         esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
         switch (scan_result->scan_rst.search_evt) {
@@ -397,6 +403,8 @@ void gattc_client_test(void)
 void app_main()
 {
     esp_bt_controller_init();
+    esp_bt_controller_enable(ESP_BT_MODE_BTDM);
+
     gattc_client_test();
 }
 

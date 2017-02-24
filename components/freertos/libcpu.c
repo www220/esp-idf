@@ -5,10 +5,12 @@
 #include "rom/ets_sys.h"
 #include "esp_newlib.h"
 #include <rtthread.h>
+#include "event_groups.h"
 
 //#define SHOW_TSK_DEBUG_INFO
 //#define SHOW_QUE_DEBUG_INFO
 //#define SHOW_TIM_DEBUG_INFO
+//#define SHOW_EVT_DEBUG_INFO
 
 portSTACK_TYPE * volatile pxCurrentTCB[ portNUM_PROCESSORS ] = { NULL };
 portSTACK_TYPE * volatile pxSaveTCB[ portNUM_PROCESSORS ] = { NULL };
@@ -22,6 +24,7 @@ static volatile unsigned short ms_index = 0;
 static volatile unsigned short mx_index = 0;
 static volatile unsigned short mr_index = 0;
 static volatile unsigned short tm_index = 0;
+static volatile unsigned short ev_index = 0;
 static volatile BaseType_t xSchedulerRunning = pdFALSE;
 
 void rt_hw_context_switch_to(rt_uint32_t to)
@@ -48,9 +51,14 @@ void rt_hw_interrupt_enable(rt_base_t level)
 }
 rt_uint8_t *rt_hw_stack_init(rt_thread_t thread, void *tentry, void *parameter, rt_uint8_t *stack_addr, void *texit)
 {
+#if configUSE_TRACE_FACILITY_2 || !portUSING_MPU_WRAPPERS || XCHAL_CP_NUM <= 0
+#pragma errno ("sizeof(xMPU_SETTINGS) must == 8")
+#endif
     thread->xCoreID = RTT_USING_CPUID;
     vPortStoreTaskMPUSettings(&(thread->xMPUSettings),NULL,thread->stack_addr,thread->stack_size);
     esp_reent_init(&thread->xNewLib_reent);
+    memset(thread->xtls, 0, sizeof(thread->xtls));
+    memset(thread->xtls_call, 0, sizeof(thread->xtls_call));
     return (rt_uint8_t *)pxPortInitialiseStack(stack_addr, tentry, parameter, pdFALSE);
 }
 
@@ -208,6 +216,23 @@ BaseType_t xTaskIncrementTick( void )
     rt_tick_increase();
     rt_interrupt_leave();
     return pdFALSE;
+}
+void *pvTaskGetThreadLocalStoragePointer( TaskHandle_t xTaskToQuery, BaseType_t xIndex )
+{
+	rt_thread_t thread = xTaskToQuery;
+
+	if( xIndex < configNUM_THREAD_LOCAL_STORAGE_POINTERS )
+		return thread->xtls[xIndex];
+	return NULL;
+}
+void vTaskSetThreadLocalStoragePointerAndDelCallback( TaskHandle_t xTaskToSet, BaseType_t xIndex, void *pvValue , TlsDeleteCallbackFunction_t xDelCallback)
+{
+	rt_thread_t thread = xTaskToSet;
+	if( xIndex < configNUM_THREAD_LOCAL_STORAGE_POINTERS )
+	{
+		thread->xtls[xIndex] = pvValue;
+		thread->xtls_call[xIndex] = xDelCallback;
+	}
 }
 TickType_t xTaskGetTickCount( void ) { return rt_tick_get(); }
 void vTaskStartScheduler(void) { rt_system_scheduler_start();xSchedulerRunning=pdTRUE;xPortStartScheduler(); }
@@ -380,6 +405,7 @@ BaseType_t xQueueTakeMutexRecursive( QueueHandle_t xMutex, TickType_t xTicksToWa
 BaseType_t xQueueGiveMutexRecursive( QueueHandle_t xMutex ) { return xQueueGenericSend(xMutex,0,0,queueSEND_TO_BACK); }
 BaseType_t xQueueGiveFromISR( QueueHandle_t xQueue, BaseType_t * const pxHigherPriorityTaskWoken ) { return xQueueGenericSendFromISR(xQueue,0,pxHigherPriorityTaskWoken,queueSEND_TO_BACK); }
 void* xQueueGetMutexHolder( QueueHandle_t xSemaphore ) { return NULL; }
+BaseType_t xQueueGenericReset( QueueHandle_t xQueue, BaseType_t xNewQueue ) { return pdPASS; }
 
 TimerHandle_t xTimerCreate( const char * const pcTimerName, const TickType_t xTimerPeriodInTicks, const UBaseType_t uxAutoReload, void * const pvTimerID, TimerCallbackFunction_t pxCallbackFunction )
 {
@@ -439,4 +465,69 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
         rt_interrupt_leave();
     }
     return (err==RT_EOK)?pdPASS:pdFAIL;
+}
+
+EventGroupHandle_t xEventGroupCreate( void )
+{
+	char name[10] = {0};
+	sprintf(name,"evt%02d",((++ev_index)%100));
+	rt_event_t obj = rt_event_create(name,RT_IPC_FLAG_PRIO);
+#ifdef SHOW_EVT_DEBUG_INFO
+	ets_printf("xEventGroupCreate cur:%s name:%s\n",
+				(rt_current_thread)?(rt_current_thread->name):("NULL"),
+				name);
+#endif
+	return obj;
+}
+void vEventGroupDelete( EventGroupHandle_t xEventGroup )
+{
+	rt_event_t obj = xEventGroup;
+#ifdef SHOW_EVT_DEBUG_INFO
+	ets_printf("vEventGroupDelete cur:%s name:%s\n",
+				(rt_current_thread)?(rt_current_thread->name):("NULL"),
+				obj->name);
+#endif
+	rt_event_delete(obj);
+}
+EventBits_t xEventGroupSetBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToSet )
+{
+	rt_event_t obj = xEventGroup;
+	rt_err_t err = rt_event_send(obj,uxBitsToSet);
+#ifdef SHOW_EVT_DEBUG_INFO
+    ets_printf("xEventGroupSetBits cur:%s name:%s bits:%x ret:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->parent.name,uxBitsToSet,err);
+#endif
+	return (err!=RT_EOK)?0:obj->set;
+}
+EventBits_t xEventGroupClearBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToClear )
+{
+	rt_event_t obj = xEventGroup;
+	rt_uint32_t recved = 0;
+	rt_err_t err = rt_event_recv(obj,uxBitsToClear,RT_EVENT_FLAG_OR|RT_EVENT_FLAG_CLEAR,0,&recved);
+#ifdef SHOW_EVT_DEBUG_INFO
+    ets_printf("xEventGroupClearBits cur:%s name:%s bits:%x ret:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->parent.name,uxBitsToClear,err);
+#endif
+	return (err!=RT_EOK)?0:recved;
+}
+EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits_t uxBitsToWaitFor, const BaseType_t xClearOnExit, const BaseType_t xWaitForAllBits, TickType_t xTicksToWait )
+{
+	rt_event_t obj = xEventGroup;
+	rt_uint32_t recved = 0;
+	rt_uint8_t option = 0;
+	if (xClearOnExit == pdTRUE)
+		option |= RT_EVENT_FLAG_CLEAR;
+	if (xWaitForAllBits == pdTRUE)
+		option |= RT_EVENT_FLAG_AND;
+	else
+		option |= RT_EVENT_FLAG_OR;
+    rt_err_t err = rt_event_recv(obj,uxBitsToWaitFor,option,xTicksToWait,&recved);
+#ifdef SHOW_EVT_DEBUG_INFO
+    ets_printf("xEventGroupWaitBits cur:%s name:%s bits:%x ret:%d\n",
+                (rt_current_thread)?(rt_current_thread->name):("NULL"),
+                obj->parent.name,uxBitsToWaitFor,err);
+#endif
+	return (err!=RT_EOK)?0:recved;
 }

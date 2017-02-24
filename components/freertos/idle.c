@@ -121,6 +121,12 @@ void rt_thread_idle_excute(void)
             if (thread->cleanup != RT_NULL)
                 thread->cleanup(thread);
             
+			/* free tls info */
+			{int x;for(x=0; x<configNUM_THREAD_LOCAL_STORAGE_POINTERS; x++){
+				if (thread->xtls_call[x])
+					thread->xtls_call[x](x, thread->xtls[x]);
+			}}
+			/* free reent */
             extern void _reclaim_reent (struct _reent * reent);
             _reclaim_reent(&(thread->xNewLib_reent));
 
