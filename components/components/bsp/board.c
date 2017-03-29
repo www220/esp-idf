@@ -393,6 +393,18 @@ void rt_hw_usart_init()
 #endif
 }
 
+void rt_hw_idle_hook(void)
+{
+	extern void esp_vApplicationIdleHook( void );
+
+#if ( configUSE_IDLE_HOOK == 1 )
+	extern void vApplicationIdleHook( void );
+	vApplicationIdleHook();
+#endif /* configUSE_IDLE_HOOK */
+
+	esp_vApplicationIdleHook();
+}
+
 void rt_hw_board_init(void)
 {
 	/* initialize gpio */
@@ -407,6 +419,8 @@ void rt_hw_board_init(void)
 #ifdef RT_USING_CONSOLE
     rt_console_set_device(CONSOLE_DEVICE);
 #endif
+
+	rt_thread_idle_sethook(rt_hw_idle_hook);
 }
 
 #ifdef RT_USING_FINSH
