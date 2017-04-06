@@ -77,11 +77,17 @@ If you can't think of a reason why you need to build it yourself, then probably 
 
 In any case, here are the steps to compile the toolchain yourself.
 
+(Note: You will also need the prerequisite packages mentioned in step 0, above.)
+
 - Install dependencies:
 
-  - Ubuntu::
+  - Ubuntu pre-16.04::
 
         sudo apt-get install gawk gperf grep gettext libncurses-dev python python-dev automake bison flex texinfo help2man libtool
+
+  - Ubuntu 16.04::
+
+        sudo apt-get install gawk gperf grep gettext python python-dev automake bison flex texinfo help2man libtool libtool-bin
 
   - Debian::
 
@@ -96,7 +102,7 @@ Download ``crosstool-NG`` and build it::
     cd ~/esp
     git clone -b xtensa-1.22.x https://github.com/espressif/crosstool-NG.git
     cd crosstool-NG
-    ./bootstrap && ./configure --prefix=$PWD && make install
+    ./bootstrap && ./configure --enable-local && make install
 
 Build the toolchain::
 
@@ -136,6 +142,9 @@ The easiest way to start a project is to download the template project from GitH
 
 This will download ``esp-idf-template`` project into ``~/esp/myapp`` directory.
 
+**IMPORTANT:** The esp-idf build system does not support spaces in paths to esp-idf or to projects.
+
+You can also find a range of example projects under the "examples" directory in IDF. These example project directories can be copied to outside IDF in order to begin your own projects.
 
 Step 4: Building and flashing the application
 =============================================

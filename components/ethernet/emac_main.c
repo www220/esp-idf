@@ -75,8 +75,7 @@ esp_err_t emac_post(emac_sig_t sig, emac_par_t par);
 
 static void emac_macaddr_init(void)
 {
-    esp_efuse_read_mac(&(emac_config.macaddr[0]));
-    emac_config.macaddr[5] = emac_config.macaddr[5] + 3;
+    esp_read_mac(&(emac_config.macaddr[0]), ESP_MAC_ETH);
 }
 
 void esp_eth_get_mac(uint8_t mac[6])
@@ -949,13 +948,13 @@ esp_err_t esp_eth_init(eth_config_t *config)
         emac_set_user_config_data(config);
     }
 
-    emac_config.emac_phy_power_enable(true);    
-
     ret = emac_verify_args();
 
     if (ret != ESP_OK) {
         goto _exit;
     }
+
+    emac_config.emac_phy_power_enable(true);    
 
     //before set emac reg must enable clk
     emac_enable_clk(true);
