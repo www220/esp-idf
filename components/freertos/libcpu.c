@@ -6,6 +6,7 @@
 #include "esp_newlib.h"
 #include <rtthread.h>
 #include "event_groups.h"
+#include "thread_esp32.h"
 
 //#define SHOW_TSK_DEBUG_INFO
 //#define SHOW_QUE_DEBUG_INFO
@@ -31,34 +32,31 @@ void rt_hw_context_switch_to(rt_uint32_t to)
 {
     pxSaveTCB[RTT_USING_CPUID] = (portSTACK_TYPE *)to;
 }
+
 void rt_hw_context_switch(rt_uint32_t from, rt_uint32_t to)
 {
     pxSaveTCB[RTT_USING_CPUID] = (portSTACK_TYPE *)to;
     portYIELD();
 }
+
 void rt_hw_context_switch_interrupt(rt_uint32_t from, rt_uint32_t to)
 {
     pxSaveTCB[RTT_USING_CPUID] = (portSTACK_TYPE *)to;
     portYIELD_FROM_ISR();
 }
+
 rt_base_t rt_hw_interrupt_disable(void)
 {
     return portENTER_CRITICAL_NESTED();
 }
+
 void rt_hw_interrupt_enable(rt_base_t level)
 {
     portEXIT_CRITICAL_NESTED(level);
 }
-rt_uint8_t *rt_hw_stack_init(rt_thread_t thread, void *tentry, void *parameter, rt_uint8_t *stack_addr, void *texit)
+
+rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter, rt_uint8_t *stack_addr, void *texit)
 {
-#if configUSE_TRACE_FACILITY_2 || !portUSING_MPU_WRAPPERS || XCHAL_CP_NUM <= 0
-#pragma errno ("sizeof(xMPU_SETTINGS) must == 8")
-#endif
-    thread->xCoreID = RTT_USING_CPUID;
-    vPortStoreTaskMPUSettings(&(thread->xMPUSettings),NULL,thread->stack_addr,thread->stack_size);
-    esp_reent_init(&thread->xNewLib_reent);
-    memset(thread->xtls, 0, sizeof(thread->xtls));
-    memset(thread->xtls_call, 0, sizeof(thread->xtls_call));
     return (rt_uint8_t *)pxPortInitialiseStack(stack_addr, tentry, parameter, pdFALSE);
 }
 
@@ -92,10 +90,12 @@ void rtthread_startup(void)
     /* init idle thread */
     rt_thread_idle_init();
 }
+
 void rt_hw_console_output(const char *str)
 {
     ets_printf(str);
 }
+
 struct _reent* __getreent()
 {
     if( xSchedulerRunning != pdFALSE )
@@ -130,6 +130,7 @@ BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const
         rt_thread_startup(thread);
         xReturn = pdPASS;
     }
+
     if (pxCreatedTask) *pxCreatedTask = thread;
 #ifdef SHOW_TSK_DEBUG_INFO
     ets_printf("TaskCreate cur:%s name:%s pri:%d size:%d\n",
@@ -138,9 +139,11 @@ BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const
 #endif
     return xReturn;
 }
+
 void vTaskDelete(xTaskHandle xTaskToDelete)
 {
     rt_thread_t thread = xTaskToDelete;
+
     if (thread == NULL)
         thread = rt_current_thread;
 #ifdef SHOW_TSK_DEBUG_INFO
@@ -151,6 +154,7 @@ void vTaskDelete(xTaskHandle xTaskToDelete)
     rt_thread_delete(thread);
     rt_schedule();
 }
+
 void vTaskSwitchContext( void )
 {
     if (pxSaveTCB[RTT_USING_CPUID] != NULL)
@@ -161,6 +165,7 @@ void vTaskSwitchContext( void )
     }
     rt_schedule();
 }
+
 TaskHandle_t xTaskGetCurrentTaskHandleForCPU( BaseType_t cpuid )
 {
     if (cpuid == RTT_USING_CPUID)
@@ -168,6 +173,7 @@ TaskHandle_t xTaskGetCurrentTaskHandleForCPU( BaseType_t cpuid )
     ets_printf("GetCurrentTaskHandleForCPU cpuid == %d\n",cpuid);
     return NULL;
 }
+
 BaseType_t xTaskGetSchedulerState( void )
 {
     BaseType_t xReturn = taskSCHEDULER_NOT_STARTED;
@@ -180,29 +186,34 @@ BaseType_t xTaskGetSchedulerState( void )
     }
     return xReturn;
 }
+
 void vTaskEnterCritical( portMUX_TYPE *mux )
 {
     vPortCPUAcquireMutex( mux );
     if( xSchedulerRunning != pdFALSE )
         rt_enter_critical();
 }
+
 void vTaskExitCritical( portMUX_TYPE *mux )
 {
     vPortCPUReleaseMutex( mux );
     if( xSchedulerRunning != pdFALSE )
         rt_exit_critical();
 }
+
 void vTaskSuspendAll( void )
 {
     if( xSchedulerRunning != pdFALSE )
         rt_enter_critical();
 }
+
 BaseType_t xTaskResumeAll( void )
 {
     if( xSchedulerRunning != pdFALSE )
         rt_exit_critical();
     return pdTRUE;
 }
+
 BaseType_t xTaskIncrementTick( void )
 { 
 #if ( configUSE_TICK_HOOK == 1 )
@@ -217,6 +228,7 @@ BaseType_t xTaskIncrementTick( void )
     rt_interrupt_leave();
     return pdFALSE;
 }
+
 void *pvTaskGetThreadLocalStoragePointer( TaskHandle_t xTaskToQuery, BaseType_t xIndex )
 {
 	rt_thread_t thread = xTaskToQuery;
@@ -225,6 +237,7 @@ void *pvTaskGetThreadLocalStoragePointer( TaskHandle_t xTaskToQuery, BaseType_t 
 		return thread->xtls[xIndex];
 	return NULL;
 }
+
 void vTaskSetThreadLocalStoragePointerAndDelCallback( TaskHandle_t xTaskToSet, BaseType_t xIndex, void *pvValue , TlsDeleteCallbackFunction_t xDelCallback)
 {
 	rt_thread_t thread = xTaskToSet;
@@ -234,8 +247,19 @@ void vTaskSetThreadLocalStoragePointerAndDelCallback( TaskHandle_t xTaskToSet, B
 		thread->xtls_call[xIndex] = xDelCallback;
 	}
 }
-TickType_t xTaskGetTickCount( void ) { return rt_tick_get(); }
-void vTaskStartScheduler(void) { rt_system_scheduler_start();xSchedulerRunning=pdTRUE;xPortStartScheduler(); }
+
+TickType_t xTaskGetTickCount( void ) 
+{ 
+	return rt_tick_get(); 
+}
+
+void vTaskStartScheduler(void) 
+{
+	rt_system_scheduler_start();
+	xSchedulerRunning=pdTRUE;
+	xPortStartScheduler(); 
+}
+
 void vTaskDelay( const TickType_t xTicksToDelay ) { rt_thread_delay(xTicksToDelay); }
 TaskHandle_t xTaskGetCurrentTaskHandle( void ) { return rt_current_thread; }
 BaseType_t xTaskGetAffinity( TaskHandle_t xTask ) { return RTT_USING_CPUID; }
@@ -245,6 +269,7 @@ extern rt_mailbox_t rt_fmq_create(const char *name, rt_size_t item, rt_size_t si
 extern rt_err_t rt_fmq_delete(rt_mailbox_t mb);
 extern rt_err_t rt_fmq_send(rt_mailbox_t mb, void *value, rt_int32_t pos, rt_int32_t timeout);
 extern rt_err_t rt_fmq_recv(rt_mailbox_t mb, void *value, rt_int32_t peek, rt_int32_t timeout);
+
 QueueHandle_t xQueueGenericCreate( const UBaseType_t uxQueueLength, const UBaseType_t uxItemSize, const uint8_t ucQueueType )
 {
     char name[10] = {0};
@@ -531,3 +556,4 @@ EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits
 #endif
 	return (err!=RT_EOK)?0:recved;
 }
+

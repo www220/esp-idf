@@ -13,6 +13,8 @@
 #include "soc/dport_reg.h"
 #include "soc/uart_struct.h"
 
+#include <thread_esp32.h>
+
 #define UART_FULL_THRESH_DEFAULT  (120)
 #define UART_TOUT_THRESH_DEFAULT   (10)
 
@@ -421,6 +423,7 @@ void rt_hw_board_init(void)
 #endif
 
 	rt_thread_idle_sethook(rt_hw_idle_hook);
+	rt_thread_inited_sethook(thread_inited);
 }
 
 #ifdef RT_USING_FINSH

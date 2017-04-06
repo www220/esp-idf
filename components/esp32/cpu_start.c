@@ -193,10 +193,12 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
     do_global_ctors();
+
 #if 1
     extern void rtthread_startup(void);
     rtthread_startup();
 #endif
+
 #if CONFIG_INT_WDT
     esp_int_wdt_init();
 #endif

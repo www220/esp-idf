@@ -494,6 +494,7 @@ struct rt_thread
     /* stack point and entry */
     void       *sp;                                     /**< stack point */
 
+	/* modify for ESP32 */
     xMPU_SETTINGS xMPUSettings;                         /**< MPU settings */
     BaseType_t    xCoreID;                              /**< coreid */
     struct _reent xNewLib_reent;                        /**< reent */

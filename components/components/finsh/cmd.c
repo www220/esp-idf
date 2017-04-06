@@ -715,7 +715,7 @@ long list(void)
                 FINSH_NEXT_SYSCALL(index))
         {
             /* skip the internal command */
-            if (rt_strncmp((char *)index->name, "__", 2) == 0) continue;
+            if (strncmp((char *)index->name, "__", 2) == 0) continue;
 
 #ifdef FINSH_USING_DESCRIPTION
             rt_kprintf("%-16s -- %s\n", index->name, index->desc);
