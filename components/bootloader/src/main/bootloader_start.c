@@ -19,6 +19,7 @@
 #include "esp_log.h"
 
 #include "rom/cache.h"
+#include "rom/efuse.h"
 #include "rom/ets_sys.h"
 #include "rom/spi_flash.h"
 #include "rom/crc.h"
@@ -29,6 +30,7 @@
 
 #include "soc/soc.h"
 #include "soc/cpu.h"
+#include "soc/rtc.h"
 #include "soc/dport_reg.h"
 #include "soc/io_mux_reg.h"
 #include "soc/efuse_reg.h"
@@ -45,7 +47,7 @@
 #include "bootloader_flash.h"
 #include "bootloader_random.h"
 #include "bootloader_config.h"
-#include "rtc.h"
+
 #include "flash_qio_mode.h"
 
 extern int _bss_start;
@@ -234,12 +236,13 @@ static bool ota_select_valid(const esp_ota_select_entry_t *s)
 
 void bootloader_main()
 {
-    /* Set CPU to 80MHz.
-       Start by ensuring it is set to XTAL, as PLL must be off first
-       (may still be on due to soft reset.)
-    */
-    rtc_set_cpu_freq(CPU_XTAL);
-    rtc_set_cpu_freq(CPU_80M);
+    /* Set CPU to 80MHz. Keep other clocks unmodified. */
+    uart_tx_wait_idle(0);
+    rtc_clk_config_t clk_cfg = RTC_CLK_CONFIG_DEFAULT();
+    clk_cfg.cpu_freq = RTC_CPU_FREQ_80M;
+    clk_cfg.slow_freq = rtc_clk_slow_freq_get();
+    clk_cfg.fast_freq = rtc_clk_fast_freq_get();
+    rtc_clk_init(clk_cfg);
 
     uart_console_configure();
     ESP_LOGI(TAG, "ESP-IDF %s 2nd stage bootloader", IDF_VER);
@@ -248,7 +251,7 @@ void bootloader_main()
 #endif
     esp_image_header_t fhdr;
     bootloader_state_t bs;
-    SpiFlashOpResult spiRet1,spiRet2;
+    esp_rom_spiflash_result_t spiRet1,spiRet2;
     esp_ota_select_entry_t sa,sb;
     const esp_ota_select_entry_t *ota_select_map;
 
@@ -258,7 +261,16 @@ void bootloader_main()
     /* disable watch dog here */
     REG_CLR_BIT( RTC_CNTL_WDTCONFIG0_REG, RTC_CNTL_WDT_FLASHBOOT_MOD_EN );
     REG_CLR_BIT( TIMG_WDTCONFIG0_REG(0), TIMG_WDT_FLASHBOOT_MOD_EN );
-    SPIUnlock();
+
+#ifndef CONFIG_SPI_FLASH_ROM_DRIVER_PATCH
+    const uint32_t spiconfig = ets_efuse_get_spiconfig();
+    if(spiconfig != EFUSE_SPICONFIG_SPI_DEFAULTS && spiconfig != EFUSE_SPICONFIG_HSPI_DEFAULTS) {
+        ESP_LOGE(TAG, "SPI flash pins are overridden. \"Enable SPI flash ROM driver patched functions\" must be enabled in menuconfig");
+        return;
+    }
+#endif
+
+    esp_rom_spiflash_unlock();
 
     ESP_LOGI(TAG, "Enabling RNG early entropy source...");
     bootloader_random_enable();
@@ -298,7 +310,7 @@ void bootloader_main()
         memcpy(&sb, (uint8_t *)ota_select_map + SPI_SEC_SIZE, sizeof(esp_ota_select_entry_t));
         bootloader_munmap(ota_select_map);
         if(sa.ota_seq == 0xFFFFFFFF && sb.ota_seq == 0xFFFFFFFF) {
-            // init status flash 
+            // init status flash
             if (bs.factory.offset != 0) {        // if have factory bin,boot factory bin
                 load_part_pos = bs.factory;
             } else {
@@ -308,19 +320,19 @@ void bootloader_main()
                 sb.ota_seq = 0x00;
                 sb.crc = ota_select_crc(&sb);
 
-                Cache_Read_Disable(0);  
-                spiRet1 = SPIEraseSector(bs.ota_info.offset/0x1000);
-                spiRet2 = SPIEraseSector(bs.ota_info.offset/0x1000+1);
-                if (spiRet1 != SPI_FLASH_RESULT_OK || spiRet2 != SPI_FLASH_RESULT_OK ) {  
+                Cache_Read_Disable(0);
+                spiRet1 = esp_rom_spiflash_erase_sector(bs.ota_info.offset/0x1000);
+                spiRet2 = esp_rom_spiflash_erase_sector(bs.ota_info.offset/0x1000+1);
+                if (spiRet1 != ESP_ROM_SPIFLASH_RESULT_OK || spiRet2 != ESP_ROM_SPIFLASH_RESULT_OK ) {
                     ESP_LOGE(TAG, SPI_ERROR_LOG);
                     return;
-                } 
-                spiRet1 = SPIWrite(bs.ota_info.offset,(uint32_t *)&sa,sizeof(esp_ota_select_entry_t));
-                spiRet2 = SPIWrite(bs.ota_info.offset + 0x1000,(uint32_t *)&sb,sizeof(esp_ota_select_entry_t));
-                if (spiRet1 != SPI_FLASH_RESULT_OK || spiRet2 != SPI_FLASH_RESULT_OK ) {  
+                }
+                spiRet1 = esp_rom_spiflash_write(bs.ota_info.offset,(uint32_t *)&sa,sizeof(esp_ota_select_entry_t));
+                spiRet2 = esp_rom_spiflash_write(bs.ota_info.offset + 0x1000,(uint32_t *)&sb,sizeof(esp_ota_select_entry_t));
+                if (spiRet1 != ESP_ROM_SPIFLASH_RESULT_OK || spiRet2 != ESP_ROM_SPIFLASH_RESULT_OK ) {
                     ESP_LOGE(TAG, SPI_ERROR_LOG);
                     return;
-                } 
+                }
                 Cache_Read_Enable(0);
             }
             //TODO:write data in ota info
@@ -545,7 +557,7 @@ static void set_cache_and_start_app(
     uint32_t drom_size,
     uint32_t irom_addr,
     uint32_t irom_load_addr,
-    uint32_t irom_size, 
+    uint32_t irom_size,
     uint32_t entry_addr)
 {
     ESP_LOGD(TAG, "configure drom and irom and start");
@@ -602,7 +614,7 @@ static void update_flash_config(const esp_image_header_t* pfhdr)
     }
     Cache_Read_Disable( 0 );
     // Set flash chip size
-    SPIParamCfg(g_rom_flashchip.deviceId, size * 0x100000, 0x10000, 0x1000, 0x100, 0xffff);
+    esp_rom_spiflash_config_param(g_rom_flashchip.device_id, size * 0x100000, 0x10000, 0x1000, 0x100, 0xffff);
     // TODO: set mode
     // TODO: set frequency
     Cache_Flush(0);
@@ -722,16 +734,7 @@ static void uart_console_configure(void)
 
     // Set configured UART console baud rate
     const int uart_baud = CONFIG_CONSOLE_UART_BAUDRATE;
-    uart_div_modify(uart_num, (APB_CLK_FREQ << 4) / uart_baud);
+    uart_div_modify(uart_num, (rtc_clk_apb_freq_get() << 4) / uart_baud);
 
 #endif // CONFIG_CONSOLE_UART_NONE
-}
-
-/* empty rtc_printf implementation, to work with librtc
-   linking. Can be removed once -lrtc is removed from bootloader's
-   main component.mk.
-*/
-int rtc_printf(void)
-{
-    return 0;
 }

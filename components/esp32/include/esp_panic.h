@@ -13,7 +13,8 @@ extern "C"
 #define PANIC_RSN_COPROCEXCEPTION 4
 #define PANIC_RSN_INTWDT_CPU0 5
 #define PANIC_RSN_INTWDT_CPU1 6
-#define PANIC_RSN_MAX 6
+#define PANIC_RSN_CACHEERR 7
+#define PANIC_RSN_MAX 7
 
 
 #ifndef __ASSEMBLER__
@@ -60,6 +61,11 @@ esp_err_t esp_set_watchpoint(int no, void *adr, int size, int flags);
  */
 void esp_clear_watchpoint(int no);
 
+
+/**
+ * @brief Stops panic WDT
+ */
+void esp_panic_wdt_stop(void);
 
 #endif
 

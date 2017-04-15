@@ -65,7 +65,9 @@ static void bta_dm_bl_change_cback (tBTM_BL_EVENT_DATA *p_data);
 static void bta_dm_policy_cback(tBTA_SYS_CONN_STATUS status, UINT8 id, UINT8 app_id, BD_ADDR peer_addr);
 
 /* Extended Inquiry Response */
+#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
 static UINT8 bta_dm_sp_cback (tBTM_SP_EVT event, tBTM_SP_EVT_DATA *p_data);
+#endif /* (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE) */
 
 static void bta_dm_set_eir (char *local_name);
 
@@ -2714,6 +2716,7 @@ static UINT8 bta_dm_authentication_complete_cback(BD_ADDR bd_addr, DEV_CLASS dev
     return BTM_SUCCESS;
 }
 
+#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
 /*******************************************************************************
 **
 ** Function         bta_dm_sp_cback
@@ -2868,6 +2871,7 @@ static UINT8 bta_dm_sp_cback (tBTM_SP_EVT event, tBTM_SP_EVT_DATA *p_data)
     APPL_TRACE_EVENT("dm status: %d", status);
     return status;
 }
+#endif /* (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE) */
 
 /*******************************************************************************
 **
@@ -4028,7 +4032,6 @@ void bta_dm_set_encryption (tBTA_DM_MSG *p_data)
 *******************************************************************************/
 static void bta_dm_observe_results_cb (tBTM_INQ_RESULTS *p_inq, UINT8 *p_eir)
 {
-    ;
     tBTA_DM_SEARCH     result;
     tBTM_INQ_INFO      *p_inq_info;
     APPL_TRACE_DEBUG("bta_dm_observe_results_cb")
@@ -4039,6 +4042,8 @@ static void bta_dm_observe_results_cb (tBTM_INQ_RESULTS *p_inq, UINT8 *p_eir)
     result.inq_res.inq_result_type  = p_inq->inq_result_type;
     result.inq_res.device_type      = p_inq->device_type;
     result.inq_res.flag             = p_inq->flag;
+    result.inq_res.adv_data_len     = p_inq->adv_data_len;
+    result.inq_res.scan_rsp_len     = p_inq->scan_rsp_len;
 
     /* application will parse EIR to find out remote device name */
     result.inq_res.p_eir = p_eir;
@@ -4107,7 +4112,7 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
     memset(&sec_event, 0, sizeof(tBTA_DM_SEC));
     switch (event) {
     case BTM_LE_IO_REQ_EVT:
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
+        // #if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
 
         bta_dm_co_ble_io_req(bda,
                              &p_data->io_req.io_cap,
@@ -4116,7 +4121,7 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
                              &p_data->io_req.max_key_size,
                              &p_data->io_req.init_keys,
                              &p_data->io_req.resp_keys);
-#endif
+        // #endif
 #if BTM_OOB_INCLUDED == FALSE
         status = BTM_SUCCESS;
 #endif
@@ -4195,7 +4200,7 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
         } else {
             sec_event.auth_cmpl.success = TRUE;
             if (!p_data->complt.smp_over_br) {
-                GATT_ConfigServiceChangeCCC(bda, TRUE, BT_TRANSPORT_LE);
+                
             }
         }
 
@@ -4467,17 +4472,15 @@ void bta_dm_ble_update_conn_params (tBTA_DM_MSG *p_data)
 *******************************************************************************/
 void bta_dm_ble_set_rand_address(tBTA_DM_MSG *p_data)
 {
-    UINT8 len = sizeof(p_data->set_addr);
-    if (len != BD_ADDR_LEN) {
-        APPL_TRACE_ERROR("Invalid random adress");
-        return;
-    }
+    BOOLEAN set_flag = false;
     if (p_data->set_addr.addr_type != BLE_ADDR_RANDOM) {
         APPL_TRACE_ERROR("Invalid random adress type = %d\n", p_data->set_addr.addr_type);
         return;
     }
     //send the setting random address to BTM layer
-    BTM_BleSetRandAddress(p_data->set_addr.address);
+    if ((set_flag = BTM_BleSetRandAddress(p_data->set_addr.address) != TRUE)){
+        APPL_TRACE_ERROR("%s,set random address fail.", __func__);
+    }
 
 }
 
@@ -4532,17 +4535,28 @@ void bta_dm_ble_observe (tBTA_DM_MSG *p_data)
     if (p_data->ble_observe.start) {
         /*Save the  callback to be called when a scan results are available */
         bta_dm_search_cb.p_scan_cback = p_data->ble_observe.p_cback;
+
         if ((status = BTM_BleObserve(TRUE, p_data->ble_observe.duration,
                                      bta_dm_observe_results_cb, bta_dm_observe_cmpl_cb)) != BTM_CMD_STARTED) {
-            APPL_TRACE_WARNING(" %s BTM_BleObserve  failed. status %d\n", __FUNCTION__, status);
+            APPL_TRACE_WARNING(" %s start observe failed. status=0x%x\n", __FUNCTION__, status);
         }
+
         if (p_data->ble_observe.p_start_scan_cback) {
             status = (status == BTM_CMD_STARTED ? BTA_SUCCESS : BTA_FAILURE);
             p_data->ble_observe.p_start_scan_cback(status);
         }
     } else {
         bta_dm_search_cb.p_scan_cback = NULL;
-        BTM_BleObserve(FALSE, 0, NULL, NULL );
+        status = BTM_BleObserve(FALSE, 0, NULL, NULL);
+
+        if (status != BTM_CMD_STARTED){
+            APPL_TRACE_WARNING(" %s stop observe failed, status=0x%x\n", __FUNCTION__, status);
+        }
+
+        if (p_data->ble_observe.p_stop_scan_cback) {
+            status = (status == BTM_CMD_STARTED ? BTA_SUCCESS : BTA_FAILURE);
+            p_data->ble_observe.p_stop_scan_cback(status);
+        }
     }
 }
 /*******************************************************************************
@@ -4713,7 +4727,20 @@ void bta_dm_ble_set_data_length(tBTA_DM_MSG *p_data)
 *******************************************************************************/
 void bta_dm_ble_broadcast (tBTA_DM_MSG *p_data)
 {
-    BTM_BleBroadcast(p_data->ble_observe.start);
+    tBTM_STATUS status = 0;
+    BOOLEAN start = p_data->ble_observe.start;
+
+    status = BTM_BleBroadcast(start);
+
+    if (p_data->ble_observe.p_stop_adv_cback){
+        if (status != BTM_SUCCESS){
+            APPL_TRACE_WARNING("%s, %s, status=0x%x\n", __func__,\
+                    (start == TRUE) ? "start adv failed" : "stop adv failed", status);
+        }
+        status = (status == BTM_SUCCESS ? BTA_SUCCESS : BTA_FAILURE);
+        p_data->ble_observe.p_stop_adv_cback(status);
+    }
+
 }
 
 /*******************************************************************************

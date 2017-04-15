@@ -135,16 +135,20 @@ void emac_mac_init(void)
     REG_SET_BIT(EMAC_GMACFRAMEFILTER_REG, EMAC_PROMISCUOUS_MODE);
 }
 
-extern void rtc_plla_ena(bool ena, uint32_t sdm0, uint32_t sdm1, uint32_t sdm2, uint32_t o_div);
+#include "soc/rtc.h"
 void emac_set_clk_rmii(void)
 {
+#if 0
     //select ex clock source
-    //REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_EXT_OSC_EN);
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_INT_OSC_EN);
-
+    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_EXT_OSC_EN);
     //ex clk enable
     REG_SET_BIT(EMAC_EX_OSCCLK_CONF_REG, EMAC_EX_OSC_CLK_SEL);
+#else
+    //select ex clock source
+    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_INT_OSC_EN);
+    //ex clk enable
     REG_SET_FIELD(EMAC_EX_CLKOUT_CONF_REG, EMAC_EX_CLK_OUT_H_DIV_NUM, 0);
     REG_SET_FIELD(EMAC_EX_CLKOUT_CONF_REG, EMAC_EX_CLK_OUT_DIV_NUM, 0);
-    rtc_plla_ena(1, 1, 0, 0, 0); // 50 MHz
+    rtc_clk_apll_enable(true, 0, 0, 6, 2); // 50 MHz
+#endif
 }

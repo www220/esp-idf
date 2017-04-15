@@ -23,6 +23,7 @@
 #include "rom/cache.h"
 
 #include "soc/cpu.h"
+#include "soc/rtc.h"
 #include "soc/dport_reg.h"
 #include "soc/io_mux_reg.h"
 #include "soc/rtc_cntl_reg.h"
@@ -54,7 +55,9 @@
 #include "esp_int_wdt.h"
 #include "esp_task_wdt.h"
 #include "esp_phy_init.h"
+#include "esp_cache_err_int.h"
 #include "esp_coexist.h"
+#include "esp_panic.h"
 #include "esp_core_dump.h"
 #include "trax.h"
 
@@ -92,6 +95,11 @@ static const char* TAG = "cpu_start";
 
 void IRAM_ATTR call_start_cpu0()
 {
+#if CONFIG_FREERTOS_UNICORE
+    RESET_REASON rst_reas[1];
+#else
+    RESET_REASON rst_reas[2];
+#endif
     cpu_configure_region_protection();
 
     //Move exception vectors to IRAM
@@ -99,10 +107,25 @@ void IRAM_ATTR call_start_cpu0()
                   "wsr    %0, vecbase\n" \
                   ::"r"(&_init_start));
 
+    rst_reas[0] = rtc_get_reset_reason(0);
+#if !CONFIG_FREERTOS_UNICORE
+    rst_reas[1] = rtc_get_reset_reason(1);
+#endif
+    // from panic handler we can be reset by RWDT or TG0WDT
+    if (rst_reas[0] == RTCWDT_SYS_RESET || rst_reas[0] == TG0WDT_SYS_RESET
+#if !CONFIG_FREERTOS_UNICORE
+        || rst_reas[1] == RTCWDT_SYS_RESET || rst_reas[1] == TG0WDT_SYS_RESET
+#endif
+        ) {
+        // stop wdt in case of any
+        ESP_EARLY_LOGI(TAG, "Stop panic WDT");
+        esp_panic_wdt_stop();
+    }
+
     memset(&_bss_start, 0, (&_bss_end - &_bss_start) * sizeof(_bss_start));
 
     /* Unless waking from deep sleep (implying RTC memory is intact), clear RTC bss */
-    if (rtc_get_reset_reason(0) != DEEPSLEEP_RESET) {
+    if (rst_reas[0] != DEEPSLEEP_RESET) {
         memset(&_rtc_bss_start, 0, (&_rtc_bss_end - &_rtc_bss_start) * sizeof(_rtc_bss_start));
     }
 
@@ -180,7 +203,7 @@ void start_cpu0_default(void)
 #endif
     esp_set_cpu_freq();     // set CPU frequency configured in menuconfig
 #ifndef CONFIG_CONSOLE_UART_NONE
-    uart_div_modify(CONFIG_CONSOLE_UART_NUM, (APB_CLK_FREQ << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
+    uart_div_modify(CONFIG_CONSOLE_UART_NUM, (rtc_clk_apb_freq_get() << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
 #endif
 #if CONFIG_BROWNOUT_DET
     esp_brownout_init();
@@ -212,9 +235,8 @@ void start_cpu0_default(void)
 #if CONFIG_TASK_WDT
     esp_task_wdt_init();
 #endif
-#if !CONFIG_FREERTOS_UNICORE
+    esp_cache_err_int_init();
     esp_crosscore_int_init();
-#endif
     esp_ipc_init();
     spi_flash_init();
     /* init default OS-aware flash access critical section */
@@ -243,6 +265,7 @@ void start_cpu1_default(void)
     }
     //Take care putting stuff here: if asked, FreeRTOS will happily tell you the scheduler
     //has started, but it isn't active *on this CPU* yet.
+    esp_cache_err_int_init();
     esp_crosscore_int_init();
 
     ESP_EARLY_LOGI(TAG, "Starting scheduler on APP CPU.");
@@ -261,7 +284,7 @@ static void do_global_ctors(void)
 static void main_task(void* args)
 {
     // Now that the application is about to start, disable boot watchdogs
-    REG_CLR_BIT(TIMG_WDTCONFIG0_REG(0), TIMG_WDT_FLASHBOOT_MOD_EN_S);
+    REG_CLR_BIT(TIMG_WDTCONFIG0_REG(0), TIMG_WDT_FLASHBOOT_MOD_EN);
     REG_CLR_BIT(RTC_CNTL_WDTCONFIG0_REG, RTC_CNTL_WDT_FLASHBOOT_MOD_EN);
     //Enable allocation in region where the startup stacks were located.
     heap_alloc_enable_nonos_stack_tag();

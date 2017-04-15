@@ -561,10 +561,12 @@ const HeapRegionTagged_t *pxHeapRegion;
         }
 
         xTotalHeapSize += pxFirstFreeBlockInRegion->xBlockSize;
+
 #if 1
 		if (pxHeapRegion->xTag == 0 || pxHeapRegion->xTag == 1 || pxHeapRegion->xTag == 15)
 			xTotalHeapSizeAll += pxFirstFreeBlockInRegion->xBlockSize;
 #endif
+
         xMinimumEverFreeBytesRemaining[ pxHeapRegion->xTag ] += pxFirstFreeBlockInRegion->xBlockSize;
         xFreeBytesRemaining[ pxHeapRegion->xTag ] += pxFirstFreeBlockInRegion->xBlockSize;
 
@@ -602,3 +604,4 @@ void list_mem(void)
     rt_kprintf("maximum allocated memory: %d\n", xTotalHeapSizeAll-xPortGetMinimumEverFreeHeapSize());
 }
 #endif
+
