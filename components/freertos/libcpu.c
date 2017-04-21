@@ -431,6 +431,13 @@ BaseType_t xQueueGiveMutexRecursive( QueueHandle_t xMutex ) { return xQueueGener
 BaseType_t xQueueGiveFromISR( QueueHandle_t xQueue, BaseType_t * const pxHigherPriorityTaskWoken ) { return xQueueGenericSendFromISR(xQueue,0,pxHigherPriorityTaskWoken,queueSEND_TO_BACK); }
 void* xQueueGetMutexHolder( QueueHandle_t xSemaphore ) { return NULL; }
 BaseType_t xQueueGenericReset( QueueHandle_t xQueue, BaseType_t xNewQueue ) { return pdPASS; }
+QueueHandle_t xQueueCreateCountingSemaphore( const UBaseType_t uxMaxCount, const UBaseType_t uxInitialCount )
+{
+    rt_sem_t sem = xQueueGenericCreate(uxMaxCount,0,queueQUEUE_TYPE_COUNTING_SEMAPHORE);
+    if (sem != 0)
+        rt_sem_control(sem, RT_IPC_CMD_RESET, (void *)uxInitialCount);
+    return sem;
+}
 
 TimerHandle_t xTimerCreate( const char * const pcTimerName, const TickType_t xTimerPeriodInTicks, const UBaseType_t uxAutoReload, void * const pvTimerID, TimerCallbackFunction_t pxCallbackFunction )
 {

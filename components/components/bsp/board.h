@@ -37,6 +37,7 @@
 #define FINSH_DEVICE_NAME "uart0"
 
 void rt_hw_board_init(void);
+int rt_hw_eth_init(void);
 
 extern unsigned xthal_get_ccount(void);
 inline uint32_t rt_hw_cpu_ms() { return xthal_get_ccount() / (CPU_CLK_FREQ_ROM / 1000); }
