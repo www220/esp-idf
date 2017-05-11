@@ -1,9 +1,9 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2015-2017 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include <stdint.h>
 #include <string.h>
 
@@ -48,6 +49,7 @@
 #include "esp_spi_flash.h"
 #include "esp_ipc.h"
 #include "esp_crosscore_int.h"
+#include "esp_dport_access.h"
 #include "esp_log.h"
 #include "esp_vfs_dev.h"
 #include "esp_newlib.h"
@@ -60,6 +62,7 @@
 #include "esp_panic.h"
 #include "esp_core_dump.h"
 #include "esp_app_trace.h"
+#include "esp_clk.h"
 #include "trax.h"
 
 #define STRINGIFY(s) STRINGIFY2(s)
@@ -109,6 +112,7 @@ void IRAM_ATTR call_start_cpu0()
                   ::"r"(&_init_start));
 
     rst_reas[0] = rtc_get_reset_reason(0);
+
 #if !CONFIG_FREERTOS_UNICORE
     rst_reas[1] = rtc_get_reset_reason(1);
 #endif
@@ -118,8 +122,7 @@ void IRAM_ATTR call_start_cpu0()
 #if !CONFIG_FREERTOS_UNICORE
         || rst_reas[1] == RTCWDT_SYS_RESET || rst_reas[1] == TG0WDT_SYS_RESET
 #endif
-        ) {
-        // stop wdt in case of any
+    ) {
         esp_panic_wdt_stop();
     }
 
@@ -140,10 +143,10 @@ void IRAM_ATTR call_start_cpu0()
     Cache_Read_Enable(1);
     esp_cpu_unstall(1);
     //Enable clock gating and reset the app cpu.
-    SET_PERI_REG_MASK(DPORT_APPCPU_CTRL_B_REG, DPORT_APPCPU_CLKGATE_EN);
-    CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_C_REG, DPORT_APPCPU_RUNSTALL);
-    SET_PERI_REG_MASK(DPORT_APPCPU_CTRL_A_REG, DPORT_APPCPU_RESETTING);
-    CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_A_REG, DPORT_APPCPU_RESETTING);
+    DPORT_SET_PERI_REG_MASK(DPORT_APPCPU_CTRL_B_REG, DPORT_APPCPU_CLKGATE_EN);
+    DPORT_CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_C_REG, DPORT_APPCPU_RUNSTALL);
+    DPORT_SET_PERI_REG_MASK(DPORT_APPCPU_CTRL_A_REG, DPORT_APPCPU_RESETTING);
+    DPORT_CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_A_REG, DPORT_APPCPU_RESETTING);
     ets_set_appcpu_boot_addr((uint32_t)call_start_cpu1);
 
     while (!app_cpu_started) {
@@ -151,7 +154,7 @@ void IRAM_ATTR call_start_cpu0()
     }
 #else
     ESP_EARLY_LOGI(TAG, "Single core mode");
-    CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_B_REG, DPORT_APPCPU_CLKGATE_EN);
+    DPORT_CLEAR_PERI_REG_MASK(DPORT_APPCPU_CTRL_B_REG, DPORT_APPCPU_CLKGATE_EN);
 #endif
 
     /* Initialize heap allocator. WARNING: This *needs* to happen *after* the app cpu has booted.
@@ -173,6 +176,7 @@ void IRAM_ATTR call_start_cpu1()
                   "wsr    %0, vecbase\n" \
                   ::"r"(&_init_start));
 
+    ets_set_appcpu_boot_addr(0); 
     cpu_configure_region_protection();
 
 #if CONFIG_CONSOLE_UART_NONE
@@ -202,7 +206,7 @@ void start_cpu0_default(void)
 #endif
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
 #endif
-    esp_set_cpu_freq();     // set CPU frequency configured in menuconfig
+    esp_clk_init();
 #ifndef CONFIG_CONSOLE_UART_NONE
     uart_div_modify(CONFIG_CONSOLE_UART_NUM, (rtc_clk_apb_freq_get() << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
 #endif
@@ -245,6 +249,9 @@ void start_cpu0_default(void)
     esp_cache_err_int_init();
     esp_crosscore_int_init();
     esp_ipc_init();
+#ifndef CONFIG_FREERTOS_UNICORE
+    esp_dport_access_int_init();
+#endif
     spi_flash_init();
     /* init default OS-aware flash access critical section */
     spi_flash_guard_set(&g_flash_guard_default_ops);
@@ -280,6 +287,7 @@ void start_cpu1_default(void)
     //has started, but it isn't active *on this CPU* yet.
     esp_cache_err_int_init();
     esp_crosscore_int_init();
+    esp_dport_access_int_init();
 
     ESP_EARLY_LOGI(TAG, "Starting scheduler on APP CPU.");
     xPortStartScheduler();

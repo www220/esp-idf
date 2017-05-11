@@ -152,28 +152,36 @@ config MEMMAP_SPISRAM
         The ESP32 can control an external SPI SRAM chip, adding the memory it contains to the
         main memory map. Enable this if you have this hardware and want to use it in the same
         way as on-chip RAM.
-
-choice NUMBER_OF_MAC_ADDRESS_GENERATED_FROM_EFUSE
-    bool "Number of MAC address generated from the hardware MAC address in efuse"
-    default FOUR_MAC_ADDRESS_FROM_EFUSE
+        
+choice NUMBER_OF_UNIVERSAL_MAC_ADDRESS
+    bool "Number of universally administered (by IEEE) MAC address"
+    default FOUR_UNIVERSAL_MAC_ADDRESS
     help
-        Config the number of MAC address which is generated from the hardware MAC address in efuse.
-        If the number is two, the MAC addresses of WiFi station and bluetooth are generated from
-        the hardware MAC address in efuse. The MAC addresses of WiFi softap and ethernet are derived
-        from that of WiFi station and bluetooth respectively. 
-        If the number is four, the MAC addresses of WiFi station, WiFi softap, bluetooth and ethernet
-        are all generated from the hardware MAC address in efuse.
+        Configure the number of universally administered (by IEEE) MAC addresses.
+        During initialisation, MAC addresses for each network interface are generated or derived from a 
+        single base MAC address.
+        If the number of universal MAC addresses is four, all four interfaces (WiFi station, WiFi softap, 
+        Bluetooth and Ethernet) receive a universally administered MAC address. These are generated 
+        sequentially by adding 0, 1, 2 and 3 (respectively) to the final octet of the base MAC address.
+        If the number of universal MAC addresses is two, only two interfaces (WiFi station and Bluetooth) 
+        receive a universally administered MAC address. These are generated sequentially by adding 0 
+        and 1 (respectively) to the base MAC address. The remaining two interfaces (WiFi softap and Ethernet) 
+        receive local MAC addresses. These are derived from the universal WiFi station and Bluetooth MAC 
+        addresses, respectively.
+        When using the default (Espressif-assigned) base MAC address, either setting can be used. When using 
+        a custom universal MAC address range, the correct setting will depend on the allocation of MAC 
+        addresses in this range (either 2 or 4 per device.)
 
-config TWO_MAC_ADDRESS_FROM_EFUSE
+config TWO_UNIVERSAL_MAC_ADDRESS
     bool "Two"
-config FOUR_MAC_ADDRESS_FROM_EFUSE
+config FOUR_UNIVERSAL_MAC_ADDRESS
     bool "Four"
 endchoice
 
-config NUMBER_OF_MAC_ADDRESS_GENERATED_FROM_EFUSE
+config NUMBER_OF_UNIVERSAL_MAC_ADDRESS
     int 
-    default 2 if TWO_MAC_ADDRESS_FROM_EFUSE 
-    default 4 if FOUR_MAC_ADDRESS_FROM_EFUSE 
+    default 2 if TWO_UNIVERSAL_MAC_ADDRESS
+    default 4 if FOUR_UNIVERSAL_MAC_ADDRESS
 
 config SYSTEM_EVENT_QUEUE_SIZE
     int "System event queue size"
@@ -186,7 +194,6 @@ config SYSTEM_EVENT_TASK_STACK_SIZE
     default 4096
     help
         Config system event task stack size in different application.
-
 
 config MAIN_TASK_STACK_SIZE
     int "Main task stack size"
@@ -522,6 +529,23 @@ config ESP32_RTC_CLOCK_SOURCE_EXTERNAL_CRYSTAL
     bool "External 32kHz crystal"
 endchoice
 
+config ESP32_RTC_CLK_CAL_CYCLES
+    int "Number of cycles for RTC_SLOW_CLK calibration"
+    default 1024
+    range 0 125000
+    help
+        When the startup code initializes RTC_SLOW_CLK, it can perform
+        calibration by comparing the RTC_SLOW_CLK frequency with main XTAL
+        frequency. This option sets the number of RTC_SLOW_CLK cycles measured
+        by the calibration routine. Higher numbers increase calibration
+        precision, which may be important for applications which spend a lot of
+        time in deep sleep. Lower numbers reduce startup time.
+        
+        When this option is set to 0, clock calibration will not be performed at
+        startup, and approximate clock frequencies will be assumed:
+        - 150000 Hz if internal RC oscillator is used as clock source
+        - 32768 Hz if the 32k crystal oscillator is used
+
 config ESP32_DEEP_SLEEP_WAKEUP_DELAY
     int "Extra delay in deep sleep wake stub (in us)"
     default 0
@@ -539,6 +563,34 @@ config ESP32_DEEP_SLEEP_WAKEUP_DELAY
 
         If you are seeing "flash read err, 1000" message printed to the
         console after deep sleep reset, try increasing this value.
+
+choice ESP32_XTAL_FREQ_SEL
+    prompt "Main XTAL frequency"
+    default ESP32_XTAL_FREQ_AUTO
+    help
+        ESP32 currently supports the following XTAL frequencies:
+            - 26 MHz
+            - 40 MHz
+        Startup code can automatically estimate XTAL frequency. This feature
+        uses the internal 8MHz oscillator as a reference. Because the internal
+        oscillator frequency is temperature dependent, it is not recommended
+        to use automatic XTAL frequency detection in applications which need
+        to work at high ambient temperatures and use high-temperature
+        qualified chips and modules.
+config ESP32_XTAL_FREQ_40
+    bool "40 MHz"
+config ESP32_XTAL_FREQ_26
+    bool "26 MHz"
+config ESP32_XTAL_FREQ_AUTO
+    bool "Autodetect"
+endchoice
+
+# Keep these values in sync with rtc_xtal_freq_t enum in soc/rtc.h
+config ESP32_XTAL_FREQ
+    int
+    default 0 if ESP32_XTAL_FREQ_AUTO
+    default 40 if ESP32_XTAL_FREQ_40
+    default 26 if ESP32_XTAL_FREQ_26
 
 endmenu
 
@@ -573,8 +625,8 @@ config ESP32_WIFI_STATIC_RX_BUFFER_NUM
 config ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM
     int "Max number of WiFi dynamic RX buffers"
     depends on WIFI_ENABLED
-    range 0 64
-    default 0
+    range 0 128
+    default 32
     help
         Set the number of WiFi dynamic rx buffers, 0 means no limitation for dynamic rx buffer
         allocation. The size of dynamic rx buffers is not fixed.

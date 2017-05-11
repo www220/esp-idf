@@ -31,9 +31,15 @@
  * once, and TIMG_RTC_CALI_RDY bit is set when counting is done. One-off mode is
  * enabled using TIMG_RTC_CALI_START bit.
  */
-uint32_t rtc_clk_cal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
+
+/**
+ * @brief Clock calibration function used by rtc_clk_cal and rtc_clk_cal_ratio
+ * @param cal_clk which clock to calibrate
+ * @param slowclk_cycles number of slow clock cycles to count
+ * @return number of XTAL clock cycles within the given number of slow clock cycles
+ */
+static uint32_t rtc_clk_cal_internal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
 {
-    rtc_xtal_freq_t xtal_freq = rtc_clk_xtal_freq_get();
     /* Enable requested clock (150k clock is always on) */
     if (cal_clk == RTC_CAL_32K_XTAL) {
         SET_PERI_REG_MASK(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_DIG_XTAL32K_EN);
@@ -53,11 +59,11 @@ uint32_t rtc_clk_cal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
         expected_freq = 32768; /* standard 32k XTAL */
     } else if (cal_clk == RTC_CAL_8MD256 ||
             (cal_clk == RTC_CAL_RTC_MUX && slow_freq == RTC_SLOW_FREQ_8MD256)) {
-        expected_freq = 8 * MHZ / 256;
+        expected_freq = RTC_FAST_CLK_FREQ_APPROX / 256;
     } else {
         expected_freq = 150000; /* 150k internal oscillator */
     }
-    uint32_t us_time_estimate = slowclk_cycles * MHZ / expected_freq;
+    uint32_t us_time_estimate = (uint32_t) (((uint64_t) slowclk_cycles) * MHZ / expected_freq);
     /* Start calibration */
     CLEAR_PERI_REG_MASK(TIMG_RTCCALICFG_REG(0), TIMG_RTC_CALI_START);
     SET_PERI_REG_MASK(TIMG_RTCCALICFG_REG(0), TIMG_RTC_CALI_START);
@@ -69,7 +75,8 @@ uint32_t rtc_clk_cal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
     /* Wait for calibration to finish up to another us_time_estimate */
     int timeout_us = us_time_estimate;
     while (!GET_PERI_REG_MASK(TIMG_RTCCALICFG_REG(0), TIMG_RTC_CALI_RDY) &&
-            timeout_us-- > 0) {
+            timeout_us > 0) {
+        timeout_us--;
         ets_delay_us(1);
     }
     if (cal_clk == RTC_CAL_32K_XTAL) {
@@ -83,9 +90,23 @@ uint32_t rtc_clk_cal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
         return 0;
     }
 
-    uint64_t xtal_cycles = REG_GET_FIELD(TIMG_RTCCALICFG1_REG(0), TIMG_RTC_CALI_VALUE);
+    return REG_GET_FIELD(TIMG_RTCCALICFG1_REG(0), TIMG_RTC_CALI_VALUE);
+}
+
+uint32_t rtc_clk_cal_ratio(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
+{
+    uint64_t xtal_cycles = rtc_clk_cal_internal(cal_clk, slowclk_cycles);
+    uint64_t ratio_64 = ((xtal_cycles << RTC_CLK_CAL_FRACT)) / slowclk_cycles;
+    uint32_t ratio = (uint32_t)(ratio_64 & UINT32_MAX);
+    return ratio;
+}
+
+uint32_t rtc_clk_cal(rtc_cal_sel_t cal_clk, uint32_t slowclk_cycles)
+{
+    rtc_xtal_freq_t xtal_freq = rtc_clk_xtal_freq_get();
+    uint64_t xtal_cycles = rtc_clk_cal_internal(cal_clk, slowclk_cycles);
     uint64_t divider = ((uint64_t)xtal_freq) * slowclk_cycles;
-    uint64_t period_64 = (xtal_cycles << RTC_CLK_CAL_FRACT) / divider;
+    uint64_t period_64 = ((xtal_cycles << RTC_CLK_CAL_FRACT) + divider / 2 - 1) / divider;
     uint32_t period = (uint32_t)(period_64 & UINT32_MAX);
     return period;
 }

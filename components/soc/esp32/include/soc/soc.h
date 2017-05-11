@@ -1,9 +1,9 @@
-// Copyright 2010-2016 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2010-2017 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
@@ -89,8 +89,8 @@
 //get field from register, uses field _S & _V to determine mask
 #define REG_GET_FIELD(_r, _f) ((REG_READ(_r) >> (_f##_S)) & (_f##_V))
 
-//set field to register, used when _f is not left shifted by _f##_S
-#define REG_SET_FIELD(_r, _f, _v) (REG_WRITE((_r),((REG_READ(_r) & ~((_f) << (_f##_S)))|(((_v) & (_f))<<(_f##_S)))))
+//set field of a register from variable, uses field _S & _V to determine mask
+#define REG_SET_FIELD(_r, _f, _v) (REG_WRITE((_r),((REG_READ(_r) & ~((_f##_V) << (_f##_S)))|(((_v) & (_f##_V))<<(_f##_S)))))
 
 //get field value from a variable, used when _f is not left shifted by _f##_S
 #define VALUE_GET_FIELD(_r, _f) (((_r) >> (_f##_S)) & (_f))
@@ -148,6 +148,16 @@
 #define  SPI_CLK_DIV                                 4
 #define  TICKS_PER_US_ROM                            26              // CPU is 80MHz
 //}}
+
+/* Overall memory map */
+#define SOC_IROM_LOW    0x400D0000
+#define SOC_IROM_HIGH   0x40400000
+#define SOC_DROM_LOW    0x3F400000
+#define SOC_DROM_HIGH   0x3F800000
+#define SOC_RTC_IRAM_LOW  0x400C0000
+#define SOC_RTC_IRAM_HIGH 0x400C2000
+#define SOC_RTC_DATA_LOW  0x50000000
+#define SOC_RTC_DATA_HIGH 0x50002000
 
 #define DR_REG_DPORT_BASE                       0x3ff00000
 #define DR_REG_RSA_BASE                         0x3ff02000
@@ -228,8 +238,8 @@
 #define ETS_GPIO_NMI_SOURCE                     23/**< interrupt of GPIO, NMI*/
 #define ETS_FROM_CPU_INTR0_SOURCE               24/**< interrupt0 generated from a CPU, level*/ /* Used for FreeRTOS */
 #define ETS_FROM_CPU_INTR1_SOURCE               25/**< interrupt1 generated from a CPU, level*/ /* Used for FreeRTOS */
-#define ETS_FROM_CPU_INTR2_SOURCE               26/**< interrupt2 generated from a CPU, level*/ /* Used for VHCI */
-#define ETS_FROM_CPU_INTR3_SOURCE               27/**< interrupt3 generated from a CPU, level*/ /* Reserved */
+#define ETS_FROM_CPU_INTR2_SOURCE               26/**< interrupt2 generated from a CPU, level*/ /* Used for DPORT Access */
+#define ETS_FROM_CPU_INTR3_SOURCE               27/**< interrupt3 generated from a CPU, level*/ /* Used for DPORT Access */
 #define ETS_SPI0_INTR_SOURCE                    28/**< interrupt of SPI0, level, SPI0 is for Cache Access, do not use this*/
 #define ETS_SPI1_INTR_SOURCE                    29/**< interrupt of SPI1, level, SPI1 is for flash read/write, do not use this*/
 #define ETS_SPI2_INTR_SOURCE                    30/**< interrupt of SPI2, level*/
@@ -276,14 +286,14 @@
 /*************************************************************************************************************
  *      Intr num                Level           Type                    PRO CPU usage           APP CPU uasge
  *      0                       1               extern level            WMAC                    Reserved
- *      1                       1               extern level            BT/BLE Host VHCI        Reserved
+ *      1                       1               extern level            BT/BLE Host HCI DMA     BT/BLE Host HCI DMA
  *      2                       1               extern level
  *      3                       1               extern level
  *      4                       1               extern level            WBB
- *      5                       1               extern level            BT/BLE Controller
+ *      5                       1               extern level            BT/BLE Controller       BT/BLE Controller
  *      6                       1               timer                   FreeRTOS Tick(L1)       FreeRTOS Tick(L1)
- *      7                       1               software                Reserved                Reserved
- *      8                       1               extern level            BT/BLE BB(RX/TX)
+ *      7                       1               software                BT/BLE VHCI             BT/BLE VHCI
+ *      8                       1               extern level            BT/BLE BB(RX/TX)        BT/BLE BB(RX/TX)
  *      9                       1               extern level
  *      10                      1               extern edge             Internal Timer
  *      11                      3               profiling
@@ -306,7 +316,7 @@
  *      28                      4               extern edge             
  *      29                      3               software                Reserved                Reserved
  *      30                      4               extern edge             Reserved                Reserved
- *      31                      5               extern level            Reserved                Reserved
+ *      31                      5               extern level            DPORT ACCESS            DPORT ACCESS
  *************************************************************************************************************
  */
 
@@ -318,6 +328,7 @@
 #define ETS_FRC1_INUM                           22
 #define ETS_T1_WDT_INUM                         24
 #define ETS_CACHEERR_INUM                       25
+#define ETS_DPORT_INUM                          31
 
 //CPU0 Interrupt number used in ROM, should be cancelled in SDK
 #define ETS_SLC_INUM                            1

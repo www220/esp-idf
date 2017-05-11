@@ -72,7 +72,7 @@ static const char device_name[] = "Alert Notification";
 
 static esp_ble_scan_params_t ble_scan_params = {
     .scan_type              = BLE_SCAN_TYPE_ACTIVE,
-    .own_addr_type          = ESP_PUBLIC_ADDR,
+    .own_addr_type          = BLE_ADDR_TYPE_PUBLIC,
     .scan_filter_policy     = BLE_SCAN_FILTER_ALLOW_ALL,
     .scan_interval          = 0x50,
     .scan_window            = 0x30
@@ -189,6 +189,13 @@ static void gattc_profile_a_event_handler(esp_gattc_cb_event_t event, esp_gatt_i
     case ESP_GATTC_WRITE_DESCR_EVT:
         ESP_LOGI(GATTC_TAG, "WRITE: status %d", p_data->write.status);
         break;
+    case ESP_GATTC_SRVC_CHG_EVT: {
+        esp_bd_addr_t bda;
+        memcpy(bda, p_data->srvc_chg.remote_bda, sizeof(esp_bd_addr_t));
+        ESP_LOGI(GATTC_TAG, "ESP_GATTC_SRVC_CHG_EVT, bd_addr:%08x%04x",(bda[0] << 24) + (bda[1] << 16) + (bda[2] << 8) + bda[3],
+                 (bda[4] << 8) + bda[5]);
+        break;
+    }
     default:
         break;
     }
@@ -291,7 +298,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
     switch (event) {
     case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
         //the unit of the duration is second
-        uint32_t duration = 10;
+        uint32_t duration = 30;
         esp_ble_gap_start_scanning(duration);
         break;
     }
@@ -316,10 +323,9 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             for (int j = 0; j < adv_name_len; j++) {
                 ESP_LOGI(GATTC_TAG, "%c", adv_name[j]);
             }
-
             if (adv_name != NULL) {
-                if (strcmp((char *)adv_name, device_name) == 0) {
-                    ESP_LOGI(GATTC_TAG, "Searched device %s", device_name);
+                if (strlen(device_name) == adv_name_len && strncmp((char *)adv_name, device_name, adv_name_len) == 0) {
+                    ESP_LOGI(GATTC_TAG, "Searched device %s\n", device_name);
                     if (connect == false) {
                         connect = true;
                         ESP_LOGI(GATTC_TAG, "Connect to the remote device.");

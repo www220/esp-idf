@@ -432,10 +432,10 @@ static eth_speed_mode_t eth_phy_get_speed_mode(void)
 static eth_duplex_mode_t eth_phy_get_duplex_mode(void)
 {
     if((esp_eth_smi_read(PHY_STATUS_REG) & DUPLEX_STATUS ) == DUPLEX_STATUS) {
-        return ETH_MDOE_FULLDUPLEX;
+        return ETH_MODE_HALFDUPLEX;
     } else {
         return ETH_MODE_HALFDUPLEX;
-    }   
+    }
 }
 
 static bool eth_phy_check_phy_link_status(void)
