@@ -88,8 +88,8 @@ void tcpip_adapter_init(void)
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].ip, 192, 168 , 4, 1);
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].gw, 192, 168 , 4, 1);
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].netmask, 255, 255 , 255, 0);
-        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].ip, 192, 168 , 11, 3);
-        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].gw, 192, 168 , 11, 1);
+        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].ip, 192, 168 , 1, 3);
+        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].gw, 192, 168 , 1, 1);
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].netmask, 255, 255 , 255, 0);
         ret = sys_sem_new(&api_sync_sem, 0);
         if (ERR_OK != ret) {

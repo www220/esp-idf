@@ -106,7 +106,7 @@ struct _reent* __getreent()
 void *rt_malloc(rt_size_t nbytes) { return pvPortMalloc(nbytes); }
 void rt_free(void *ptr) { vPortFree(ptr); }
 
-BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const pcName, const uint16_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask, const BaseType_t xCoreID )
+BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const pcName, const uint32_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask, const BaseType_t xCoreID )
 {
     BaseType_t xRunPrivileged;
 	uint16_t usStackDepthC;
