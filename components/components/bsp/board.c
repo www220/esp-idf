@@ -628,4 +628,7 @@ int pin_val(int argc, char **argv)
 
 MSH_CMD_EXPORT_ALIAS(pin_cfg, pin_cfg, PIN Config.);
 MSH_CMD_EXPORT_ALIAS(pin_val, pin_val, PIN Read.);
+
+extern int lua_main (int argc, char **argv);
+MSH_CMD_EXPORT_ALIAS(lua_main, lua, LUA run engine.);
 #endif
