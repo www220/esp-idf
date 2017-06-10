@@ -131,6 +131,7 @@ const tBTA_DM_ACTION bta_dm_action[BTA_DM_MAX_EVT] = {
     bta_dm_ble_read_scan_reports,           /* BTA_DM_API_BLE_READ_SCAN_REPORTS_EVT */
     bta_dm_ble_track_advertiser,            /* BTA_DM_API_BLE_TRACK_ADVERTISER_EVT */
     bta_dm_ble_get_energy_info,             /* BTA_DM_API_BLE_ENERGY_INFO_EVT */
+    bta_dm_ble_disconnect,                  /* BTA_DM_API_BLE_DISCONNECT_EVT */
 #endif
 
     bta_dm_enable_test_mode,                /*  BTA_DM_API_ENABLE_TEST_MODE_EVT     */
@@ -175,9 +176,9 @@ enum {
 #if (SDP_INCLUDED == TRUE)
     BTA_DM_API_DI_DISCOVER,             /* 17 bta_dm_di_disc */
 #endif  ///SDP_INCLUDED == TRUE
-#if BLE_INCLUDED == TRUE
+#if BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE && BTA_GATT_INCLUDED == TRUE && GATTC_INCLUDED == TRUE
     BTA_DM_CLOSE_GATT_CONN,             /* 18 bta_dm_close_gatt_conn */
-#endif
+#endif /* BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE && BTA_GATT_INCLUDED == TRUE && GATTC_INCLUDED == TRUE */
     BTA_DM_SEARCH_NUM_ACTIONS           /* 19 */
 };
 
@@ -215,7 +216,7 @@ const tBTA_DM_ACTION bta_dm_search_action[] = {
 #if (SDP_INCLUDED == TRUE)
     bta_dm_di_disc                      /* 17 BTA_DM_API_DI_DISCOVER */
 #endif  ///SDP_INCLUDED == TRUE
-#if BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE
+#if BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE && BTA_GATT_INCLUDED == TRUE && GATTC_INCLUDED == TRUE
     , bta_dm_close_gatt_conn
 #endif
 };
@@ -247,7 +248,8 @@ const UINT8 bta_dm_search_idle_st_table[][BTA_DM_SEARCH_NUM_COLS] = {
 #if (SDP_INCLUDED == TRUE)
     /* API_DI_DISCOVER_EVT */   {BTA_DM_API_DI_DISCOVER,           BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_ACTIVE},
 #endif  ///SDP_INCLUDED == TRUE
-#if BLE_INCLUDED == TRUE
+#if BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE && BTA_GATT_INCLUDED == TRUE && GATTC_INCLUDED == TRUE
+    // #if BLE_INCLUDED == TRUE
     /* DISC_CLOSE_TOUT_EVT */   {BTA_DM_CLOSE_GATT_CONN,           BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_IDLE},
 #endif
 };
@@ -265,7 +267,8 @@ const UINT8 bta_dm_search_search_active_st_table[][BTA_DM_SEARCH_NUM_COLS] = {
     /* SEARCH_CMPL_EVT */       {BTA_DM_SEARCH_CMPL,               BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_IDLE},
     /* DISCV_RES_EVT */         {BTA_DM_SEARCH_RESULT,             BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_ACTIVE},
     /* API_DI_DISCOVER_EVT */   {BTA_DM_SEARCH_IGNORE,             BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_ACTIVE}
-#if BLE_INCLUDED == TRUE
+#if BLE_INCLUDED == TRUE && SDP_INCLUDED == TRUE && BTA_GATT_INCLUDED == TRUE && GATTC_INCLUDED == TRUE
+    // #if BLE_INCLUDED == TRUE
     /* DISC_CLOSE_TOUT_EVT */   , {BTA_DM_CLOSE_GATT_CONN,          BTA_DM_SEARCH_IGNORE,          BTA_DM_SEARCH_ACTIVE}
 #endif
 

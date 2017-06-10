@@ -91,6 +91,7 @@ typedef enum {
     ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT,                      /*!< When stop adv complete, the event comes */
     ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT,                     /*!< When stop scan complete, the event comes */
     ESP_GAP_BLE_SET_STATIC_RAND_ADDR_EVT,                   /*!< When set the static rand address complete, the event comes */
+    ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT,                     /*!< When update connection parameters complete, the event comes */
 } esp_gap_ble_cb_event_t;
 
 /// Advertising data maximum length
@@ -508,6 +509,19 @@ typedef union {
     struct ble_set_rand_cmpl_evt_param {
         esp_bt_status_t status;                     /*!< Indicate set static rand address operation success status */
     } set_rand_addr_cmpl;                           /*!< Event parameter of ESP_GAP_BLE_SET_STATIC_RAND_ADDR_EVT */
+    /**
+     * @brief ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT
+     */
+    struct ble_update_conn_params_evt_param {
+        esp_bt_status_t status;                    /*!< Indicate update connection parameters success status */
+        esp_bd_addr_t bda;                         /*!< Bluetooth device address */
+        uint16_t min_int;                          /*!< Min connection interval */
+        uint16_t max_int;                          /*!< Max connection interval */
+        uint16_t latency;                          /*!< Slave latency for the connection in number of connection events. Range: 0x0000 to 0x01F3 */
+        uint16_t conn_int;                         /*!< Current connection interval */
+        uint16_t timeout;                          /*!< Supervision timeout for the LE Link. Range: 0x000A to 0x0C80.
+                                                     Mandatory Range: 0x000A to 0x0C80 Time = N * 10 msec */
+    }update_conn_params;                           /*!< Event parameter of ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT */
 } esp_ble_gap_cb_param_t;
 
 /**
@@ -782,6 +796,17 @@ esp_err_t esp_ble_passkey_reply(esp_bd_addr_t bd_addr, bool accept, uint32_t pas
 *
 */
 esp_err_t esp_ble_confirm_reply(esp_bd_addr_t bd_addr, bool accept);
+
+/**
+* @brief           This function is to disconnect the physical connection of the peer device
+*
+* @param[in]       remote_device : BD address of the peer device
+*
+* @return            - ESP_OK : success
+*                    - other  : failed
+*
+*/
+esp_err_t esp_ble_gap_disconnect(esp_bd_addr_t remote_device);
 
 #ifdef __cplusplus
 }

@@ -136,6 +136,7 @@ enum {
     BTA_DM_API_BLE_READ_SCAN_REPORTS_EVT,
     BTA_DM_API_BLE_TRACK_ADVERTISER_EVT,
     BTA_DM_API_BLE_ENERGY_INFO_EVT,
+    BTA_DM_API_BLE_DISCONNECT_EVT,
 
 #endif
 
@@ -478,7 +479,7 @@ typedef struct {
 typedef struct {
     BT_HDR                  hdr;
     BOOLEAN                 start;
-    UINT16                  duration;
+    UINT32                  duration;
     tBTA_DM_SEARCH_CBACK    *p_cback;
     tBTA_START_STOP_SCAN_CMPL_CBACK *p_start_scan_cback;
     tBTA_START_STOP_SCAN_CMPL_CBACK *p_stop_scan_cback;
@@ -613,6 +614,11 @@ typedef struct {
     tBTA_BLE_ENERGY_INFO_CBACK *p_energy_info_cback;
 } tBTA_DM_API_ENERGY_INFO;
 
+typedef struct {
+    BT_HDR      hdr;
+    BD_ADDR     remote_bda;
+} tBTA_DM_API_BLE_DISCONNECT;
+
 #endif /* BLE_INCLUDED */
 
 /* data type for BTA_DM_API_REMOVE_ACL_EVT */
@@ -637,6 +643,7 @@ typedef struct {
     UINT16      max_int;
     UINT16      latency;
     UINT16      timeout;
+    tBTA_UPDATE_CONN_PARAM_CBACK *update_conn_param_cb;
 } tBTA_DM_API_UPDATE_CONN_PARAM;
 
 #if BLE_ANDROID_CONTROLLER_SCAN_FILTER == TRUE
@@ -753,6 +760,7 @@ typedef union {
     tBTA_DM_API_DISABLE_SCAN            ble_disable_scan;
     tBTA_DM_API_TRACK_ADVERTISER        ble_track_advert;
     tBTA_DM_API_ENERGY_INFO             ble_energy_info;
+    tBTA_DM_API_BLE_DISCONNECT          ble_disconnect;
 #endif
 
     tBTA_DM_API_REMOVE_ACL              remove_acl;
@@ -1120,9 +1128,12 @@ extern void bta_dm_ble_set_conn_params (tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_set_scan_params(tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_set_scan_fil_params(tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_set_conn_scan_params (tBTA_DM_MSG *p_data);
+#if ((defined BTA_GATT_INCLUDED) &&  (BTA_GATT_INCLUDED == TRUE) && SDP_INCLUDED == TRUE) && (GATTC_INCLUDED == TRUE)
 extern void bta_dm_close_gatt_conn(tBTA_DM_MSG *p_data);
+#endif /* ((defined BTA_GATT_INCLUDED) &&  (BTA_GATT_INCLUDED == TRUE) && SDP_INCLUDED == TRUE) && (GATTC_INCLUDED == TRUE) */
 extern void bta_dm_ble_observe (tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_update_conn_params (tBTA_DM_MSG *p_data);
+extern void bta_dm_ble_disconnect (tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_set_rand_address(tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_stop_advertising(tBTA_DM_MSG *p_data);
 extern void bta_dm_ble_config_local_privacy (tBTA_DM_MSG *p_data);

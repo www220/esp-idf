@@ -74,19 +74,29 @@ int linenoise_getline( int id, char* buffer, int maxinput, const char* prompt )
 			rt_thread_delay(1);
 			continue;
 		}
-		buffer[bufpos++] = ch;
-		// 退出标志需要循环读取
-		if (ch == '\r'){
+		// 退格操作，清理无效字符
+		if (ch == 0x7f || ch == 0x08){
+			if (bufpos>0){
+				bufpos--;
+            	rt_kprintf("\b \b");
+				buffer[bufpos] = '0';
+			}
+			continue;
+		// 转定义操作，需要循环读取
+		}else if (ch == 0x1b){
+			char next[10] = {0};
+			rt_thread_delay(10);
+			rt_device_read(shell, 0, &next, 10);
+			continue;
+		// 回车操作，需要循环读取
+		}else if (ch == '\r'){
 			char next;
-			if (rt_device_read(shell, 0, &next, 1) <= 0){
+			rt_thread_delay(10);
+			if (rt_device_read(shell, 0, &next, 1) > 0){
 				if (next != '\0') ch = next;
-			}else{
-				rt_thread_delay(1);
-				if (rt_device_read(shell, 0, &next, 1) <= 0){
-					if (next != '\0') ch = next;
-				}
 			}
 		}
+		// 判断是否读取完成
 		if (bufpos+1 >= maxinput || ch=='\r' || ch=='\n'){
 			buffer[bufpos] = '\0';
 			// 退出shell
@@ -96,9 +106,11 @@ int linenoise_getline( int id, char* buffer, int maxinput, const char* prompt )
 			// 输出换行
 			rt_kprintf("\n");
 			return 0;
-		}else{
-			rt_kprintf("%c", ch);
 		}
+		// 替换非法字符
+		if (ch < ' ' || ch > '~') ch = '`';
+		rt_kprintf("%c", ch);
+		buffer[bufpos++] = ch;
 	}
     return -1;
 }
