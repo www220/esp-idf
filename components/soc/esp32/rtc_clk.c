@@ -152,15 +152,9 @@ bool rtc_clk_8md256_enabled()
 
 void rtc_clk_apll_enable(bool enable, uint32_t sdm0, uint32_t sdm1, uint32_t sdm2, uint32_t o_div)
 {
-    if (enable){
-        REG_CLR_BIT(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PD);
-        REG_SET_BIT(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PU);
-        REG_CLR_BIT(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_BIAS_I2C_FORCE_PD);
-    }else{
-        REG_SET_BIT(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PD);
-        REG_CLR_BIT(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PU);
-        REG_SET_BIT(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_BIAS_I2C_FORCE_PD);
-    }
+    REG_SET_FIELD(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PD, enable ? 0 : 1);
+    REG_SET_FIELD(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PU, enable ? 1 : 0);
+    REG_SET_FIELD(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_BIAS_I2C_FORCE_PD, enable ? 0 : 1);
 
     if (!enable &&
         REG_GET_FIELD(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_SOC_CLK_SEL) != RTC_CNTL_SOC_CLK_SEL_PLL) {
@@ -218,11 +212,7 @@ uint32_t rtc_clk_slow_freq_get_hz()
 
 void rtc_clk_fast_freq_set(rtc_fast_freq_t fast_freq)
 {
-    if (fast_freq){
-        REG_SET_BIT(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_FAST_CLK_RTC_SEL);
-    }else{
-        REG_CLR_BIT(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_FAST_CLK_RTC_SEL);
-    }
+    REG_SET_FIELD(RTC_CNTL_CLK_CONF_REG, RTC_CNTL_FAST_CLK_RTC_SEL, fast_freq);
     ets_delay_us(DELAY_FAST_CLK_SWITCH);
 }
 
