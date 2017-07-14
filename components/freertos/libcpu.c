@@ -7,6 +7,7 @@
 #include <rtthread.h>
 #include "event_groups.h"
 #include "thread_esp32.h"
+#include "esp_heap_caps.h"
 
 //#define SHOW_TSK_DEBUG_INFO
 //#define SHOW_QUE_DEBUG_INFO
@@ -564,3 +565,8 @@ EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits
 	return (err!=RT_EOK)?0:recved;
 }
 
+void list_mem(void)
+{
+	heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+	heap_caps_print_heap_info(MALLOC_CAP_EXEC);
+}
