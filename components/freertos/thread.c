@@ -36,6 +36,8 @@
  * 2011-09-08     Bernard      fixed the scheduling issue in rt_thread_startup.
  * 2012-12-29     Bernard      fixed compiling warning.
  * 2016-08-09     ArdaFu       add thread suspend and resume hook.
+ * 2017-04-10     armink       fixed the rt_thread_delete and rt_thread_detach
+                               bug when thread has not startup.
  */
 
 #include <rtthread.h>
@@ -156,6 +158,12 @@ static rt_err_t _rt_thread_init(struct rt_thread *thread,
     RT_ASSERT(priority < RT_THREAD_PRIORITY_MAX);
     thread->init_priority    = priority;
     thread->current_priority = priority;
+
+    thread->number_mask = 0;
+#if RT_THREAD_PRIORITY_MAX > 32
+    thread->number = 0;
+    thread->high_mask = 0;
+#endif
 
     /* tick init */
     thread->init_tick      = tick;
@@ -297,8 +305,11 @@ rt_err_t rt_thread_detach(rt_thread_t thread)
     /* thread check */
     RT_ASSERT(thread != RT_NULL);
 
-    /* remove from schedule */
-    rt_schedule_remove_thread(thread);
+    if (thread->stat != RT_THREAD_INIT)
+    {
+        /* remove from schedule */
+        rt_schedule_remove_thread(thread);
+    }
 
     /* release thread timer */
     rt_timer_detach(&(thread->thread_timer));
@@ -392,8 +403,11 @@ rt_err_t rt_thread_delete(rt_thread_t thread)
     /* thread check */
     RT_ASSERT(thread != RT_NULL);
 
-    /* remove from schedule */
-    rt_schedule_remove_thread(thread);
+    if (thread->stat != RT_THREAD_INIT)
+    {
+        /* remove from schedule */
+        rt_schedule_remove_thread(thread);
+    }
 
     /* release thread timer */
     rt_timer_detach(&(thread->thread_timer));

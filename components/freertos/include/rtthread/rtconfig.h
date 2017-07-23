@@ -89,4 +89,9 @@
 /* a runtime libc library */
 #define RT_USING_NEWLIB
 
+/* SECTION: device filesystem */
+/* Using Device file system */
+#define RT_USING_DFS
+#define DFS_USING_WORKDIR
+
 #endif

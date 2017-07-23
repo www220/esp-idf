@@ -422,28 +422,6 @@ char *rt_strncpy(char *dst, const char *src, rt_ubase_t n)
 }
 RTM_EXPORT(rt_strncpy);
 
-char *rt_strcpy(char *dst, const char *src)
-{
-    char *d = dst;
-
-    while ((*dst++ = *src++) != 0);
-
-    return d;
-}
-RTM_EXPORT(rt_strcpy);
-
-char *rt_strcat(char *dst, const char *src)
-{
-    char *d = dst;
-
-    while (*dst)
-        dst++;
-    while ((*dst++ = *src++) != 0);
-
-    return d;
-}
-RTM_EXPORT(rt_strcat);
-
 /**
  * This function will compare two strings with specified maximum length
  *
@@ -555,7 +533,7 @@ void rt_show_version(void)
     rt_kprintf("- RT -     Thread Operating System\n");
     rt_kprintf(" / | \\     %d.%d.%d build %s\n",
                RT_VERSION, RT_SUBVERSION, RT_REVISION, __DATE__);
-    rt_kprintf(" 2006 - 2016 Copyright by rt-thread team\n");
+    rt_kprintf(" 2006 - 2017 Copyright by rt-thread team\n");
 }
 RTM_EXPORT(rt_show_version);
 
@@ -1287,7 +1265,7 @@ const rt_uint8_t __lowest_bit_bitmap[] =
  * @return return the index of the first bit set. If value is 0, then this function
  * shall return 0.
  */
-int __rt_ffs(int value)
+rt_ubase_t __rt_ffs(rt_ubase_t value)
 {
     if (value == 0) return 0;
 
