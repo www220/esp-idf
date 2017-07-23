@@ -7,7 +7,6 @@
 #include "freertos/timers.h"
 #include "freertos/queue.h"
 #include "freertos/StackMacros.h"
-#include "freertos/xtensa_rtos.h"
 
 /* RT_NAME_MAX*/
 #define RT_NAME_MAX	16
