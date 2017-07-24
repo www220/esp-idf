@@ -164,7 +164,7 @@ void rt_thread_inited_sethook (void (*hook)(rt_thread_t thread));
  * idle thread interface
  */
 void rt_thread_idle_init(void);
-#ifdef RT_USING_HOOK
+#if defined(RT_USING_HOOK) || defined(RT_USING_IDLE_HOOK)
 void rt_thread_idle_sethook(void (*hook)(void));
 #endif
 void rt_thread_idle_excute(void);
@@ -507,7 +507,7 @@ rt_device_t rt_console_get_device(void);
 rt_err_t rt_get_errno(void);
 void rt_set_errno(rt_err_t no);
 int *_rt_errno(void);
-#ifndef RT_USING_NEWLIB
+#if !defined(RT_USING_NEWLIB) && !defined(_WIN32)
 #ifndef errno
 #define errno    *_rt_errno()
 #endif
@@ -527,8 +527,6 @@ char *rt_strncpy(char *dest, const char *src, rt_ubase_t n);
 void *rt_memmove(void *dest, const void *src, rt_ubase_t n);
 rt_int32_t rt_memcmp(const void *cs, const void *ct, rt_ubase_t count);
 rt_uint32_t rt_strcasecmp(const char *a, const char *b);
-char *rt_strcpy(char *dest, const char *src);
-char *rt_strcat(char *dest, const char *src);
 
 void rt_show_version(void);
 

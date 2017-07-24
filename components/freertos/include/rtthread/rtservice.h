@@ -114,7 +114,7 @@ rt_inline int rt_list_isempty(const rt_list_t *l)
     ((type *)((char *)(node) - (unsigned long)(&((type *)0)->member)))
 
 /**
- * list_for_each_entry  -   iterate over list of given type
+ * rt_list_for_each_entry  -   iterate over list of given type
  * @pos:    the type * to use as a loop cursor.
  * @head:   the head for your list.
  * @member: the name of the list_struct within the struct.
@@ -125,7 +125,7 @@ rt_inline int rt_list_isempty(const rt_list_t *l)
          pos = rt_list_entry(pos->member.next, typeof(*pos), member))
 
 /**
- * list_first_entry - get the first element from a list
+ * rt_list_first_entry - get the first element from a list
  * @ptr:    the list head to take the element from.
  * @type:   the type of the struct this is embedded in.
  * @member: the name of the list_struct within the struct.
