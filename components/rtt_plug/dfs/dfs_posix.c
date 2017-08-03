@@ -1,6 +1,8 @@
 #include "dfs_posix.h"
 #include <errno.h>
 #include <sys/stat.h>
+#include "wear_levelling.h"
+#include "esp_partition.h"
 
 #ifdef DFS_USING_WORKDIR
 char working_directory[DFS_PATH_MAX] = {"/"};
@@ -189,11 +191,82 @@ int chdir(const char *path)
 
 void cat(const char* filename)
 {
-	rt_kprintf("cat cmd filename:%s\n", filename);
+	char *full = dfs_normalize_path(NULL, filename);
+	if (full == NULL)
+		return;
+	int length, fd = open(full, O_RDONLY, 0);
+	rt_free(full);
+
+	if (fd < 0) {
+		rt_kprintf("Open %s failed\n", filename);
+		return;
+	}
+
+	do
+	{
+		char buffer[81] = {0};
+        length = read(fd, buffer, sizeof(buffer)-1 );
+        if (length > 0)
+            rt_kprintf("%s", buffer);
+    }while (length > 0);
+
+    close(fd);
 }
+
+#define BUF_SZ  4096
 void copy(const char *src, const char *dst)
 {
-	rt_kprintf("copy cmd src:%s dst:%s\n", src, dst);
+    rt_uint8_t *block_ptr;
+    block_ptr = rt_malloc(BUF_SZ);
+    if (block_ptr == RT_NULL)
+    {
+        rt_kprintf("out of memory\n");
+        return;
+    }
+
+	char *full = dfs_normalize_path(NULL, src);
+	if (full == NULL)
+		return;
+	int read_bytes, src_fd = open(full, O_RDONLY, 0);
+	free(full);
+    if (src_fd < 0)
+    {
+        rt_free(block_ptr);
+        rt_kprintf("Read %s failed\n", src);
+        return;
+    }
+	full = dfs_normalize_path(NULL, dst);
+	if (full == NULL){
+		close(src_fd);
+		return;
+	}
+	int dst_fd = open(full, O_WRONLY|O_CREAT, 0);
+	free(full);
+    if (dst_fd < 0)
+    {
+        close(src_fd);
+        rt_free(block_ptr);
+        rt_kprintf("Write %s failed\n", dst);
+        return;
+    }
+
+    do
+    {
+        read_bytes = read(src_fd, block_ptr, BUF_SZ);
+        if (read_bytes > 0)
+        {
+            int length = write(dst_fd, block_ptr, read_bytes);
+            if (length != read_bytes)
+            {
+                rt_kprintf("Write file data failed, length=%d\n", length);
+                break;
+            }
+        }
+    } while (read_bytes > 0);
+
+    close(src_fd);
+    close(dst_fd);
+    rt_free(block_ptr);
 }
 
 void ls(const char *pathname)
@@ -244,6 +317,15 @@ void ls(const char *pathname)
 
 int dfs_mkfs(const char *fs_name, const char *device_name)
 {
-	rt_kprintf("dfs_mkfs fs_name:%s device_name:%s\n", fs_name, device_name);
-    return RT_ENOSYS;
+    const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "storage");
+	if (part == NULL)
+	{
+		rt_kprintf("No such part storage\n");
+		return RT_ERROR;
+	}
+	rt_kprintf("part storage begin:%x,size:%x\n", part->address, part->size);
+	rt_tick_t t1 = rt_tick_get();
+	esp_partition_erase_range(part, 0, part->size);
+	rt_kprintf("part storage finish to erase elapsed:%d\n", rt_tick_get()-t1);
+    return RT_EOK;
 }

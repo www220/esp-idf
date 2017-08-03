@@ -452,7 +452,7 @@ TimerHandle_t xTimerCreate( const char * const pcTimerName, const TickType_t xTi
     if (xTimerPeriodInTicks > 0)
     {
         rt_uint8_t flag = (uxAutoReload == pdTRUE)?(RT_TIMER_FLAG_PERIODIC):(RT_TIMER_FLAG_ONE_SHOT);
-        obj = rt_timer_create(tname,pxCallbackFunction,pvTimerID,xTimerPeriodInTicks,flag);
+        obj = rt_timer_create(tname,pxCallbackFunction,pvTimerID,xTimerPeriodInTicks,flag|RT_TIMER_FLAG_SOFT_TIMER);
     }
 #ifdef SHOW_TIM_DEBUG_INFO
     ets_printf("xTimerCreate cur:%s name:%s tick:%d auto:%d id:%x func:%x\n",
@@ -469,7 +469,7 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
 #ifdef SHOW_TIM_DEBUG_INFO
     ets_printf("xTimerCommand cur:%s name:%s cmd:%d val:%d tim:%d\n",
                 (rt_current_thread)?(rt_current_thread->name):("NULL"),
-                obj->parent.name,xCommandID,xOptionalValue,xBlockTime);
+                obj->parent.name,xCommandID,xOptionalValue,xTicksToWait);
 #endif
     rt_err_t err = RT_EOK;
     switch(xCommandID)
@@ -565,8 +565,25 @@ EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits
 	return (err!=RT_EOK)?0:recved;
 }
 
+void rt_memory_info(rt_uint32_t *total, rt_uint32_t *used, rt_uint32_t *max_used)
+{
+	multi_heap_info_t info;
+    heap_caps_get_info(&info, MALLOC_CAP_8BIT);
+
+    if (total != RT_NULL)
+        *total = info.total_allocated_bytes+info.total_free_bytes;
+    if (used  != RT_NULL)
+        *used = info.total_allocated_bytes;
+    if (max_used != RT_NULL)
+        *max_used = info.total_allocated_bytes+info.total_free_bytes-info.minimum_free_bytes;
+}
+
 void list_mem(void)
 {
-	heap_caps_print_heap_info(MALLOC_CAP_8BIT);
-	heap_caps_print_heap_info(MALLOC_CAP_EXEC);
+	multi_heap_info_t info;
+    heap_caps_get_info(&info, MALLOC_CAP_8BIT);
+
+    rt_kprintf("total memory: %d\n", info.total_allocated_bytes+info.total_free_bytes);
+    rt_kprintf("used memory : %d\n", info.total_allocated_bytes);
+    rt_kprintf("maximum allocated memory: %d\n", info.total_allocated_bytes+info.total_free_bytes-info.minimum_free_bytes);
 }

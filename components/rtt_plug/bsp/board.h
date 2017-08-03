@@ -39,6 +39,22 @@
 void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
 
+extern volatile int eth_wtdog;
+extern volatile int eth_linkstatus;
+extern volatile int wtdog_count;
+extern volatile int sys_stauts;
+extern volatile int ppp_linkstauts;
+extern volatile int uptime_count;
+extern unsigned char PZ[4];
+extern char RTT_USER[16];
+extern char RTT_PASS[36];
+
+#define rttIoScanDir "/spi/ioscan"
+#define LUA_PATH_DEFAULT rttIoScanDir"/?.lc;"rttIoScanDir"/?.lua;"
+
+char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);
+int SetPrivateStringData(const char *name, const char *buf, const char *file);
+
 extern unsigned xthal_get_ccount(void);
 inline uint32_t rt_hw_cpu_ms() { return xthal_get_ccount() / (CPU_CLK_FREQ_ROM / 1000); }
 

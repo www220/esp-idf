@@ -58,6 +58,10 @@ LUALIB_API int ( luaopen_elua )( lua_State *L );
 #define AUXLIB_I2C  "i2c"
 LUALIB_API int ( luaopen_i2c )( lua_State *L );
 
+#define AUXLIB_IOSCAN  "ioscan"
+LUALIB_API int (luaopen_ioscan)(lua_State *L);
+int l_unpack_common(lua_State *L, const char *s, size_t len, const char *f, int i);
+
 // Helper macros
 #define MOD_CHECK_ID( mod, id )\
   if( !platform_ ## mod ## _exists( id ) )\

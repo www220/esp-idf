@@ -11,7 +11,7 @@
 #include <rtthread.h>
 
 #define O_DIRECTORY     0x200000
-#define DFS_PATH_MAX    255
+#define DFS_PATH_MAX    64
 
 #define NO_WORKING_DIR  "system does not support working directory\n"
 int dfs_mkfs(const char *fs_name, const char *device_name);

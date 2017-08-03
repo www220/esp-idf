@@ -42,7 +42,7 @@ static tcpip_adapter_ip_info_t esp_ip[TCPIP_ADAPTER_IF_MAX];
 static tcpip_adapter_ip6_info_t esp_ip6[TCPIP_ADAPTER_IF_MAX];
 
 static tcpip_adapter_dhcp_status_t dhcps_status = TCPIP_ADAPTER_DHCP_INIT;
-static tcpip_adapter_dhcp_status_t dhcpc_status[TCPIP_ADAPTER_IF_MAX] = {TCPIP_ADAPTER_DHCP_INIT,TCPIP_ADAPTER_DHCP_INIT,TCPIP_ADAPTER_DHCP_STOPPED};
+static tcpip_adapter_dhcp_status_t dhcpc_status[TCPIP_ADAPTER_IF_MAX] = {TCPIP_ADAPTER_DHCP_INIT,TCPIP_ADAPTER_DHCP_INIT,TCPIP_ADAPTER_DHCP_INIT};
 static esp_err_t tcpip_adapter_start_api(tcpip_adapter_api_msg_t * msg);
 static esp_err_t tcpip_adapter_stop_api(tcpip_adapter_api_msg_t * msg);
 static esp_err_t tcpip_adapter_up_api(tcpip_adapter_api_msg_t * msg);
@@ -89,9 +89,6 @@ void tcpip_adapter_init(void)
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].ip, 192, 168 , 4, 1);
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].gw, 192, 168 , 4, 1);
         IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_AP].netmask, 255, 255 , 255, 0);
-        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].ip, 192, 168 , 1, 3);
-        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].gw, 192, 168 , 1, 1);
-        IP4_ADDR(&esp_ip[TCPIP_ADAPTER_IF_ETH].netmask, 255, 255 , 255, 0);
         ret = sys_sem_new(&api_sync_sem, 0);
         if (ERR_OK != ret) {
             ESP_LOGD(TAG, "tcpip adatper api sync sem init fail");
