@@ -50,6 +50,7 @@ extern char RTT_USER[16];
 extern char RTT_PASS[36];
 
 #define rttIoScanDir "/spi/ioscan"
+#define rttLogDir "/spi/log"
 #define LUA_PATH_DEFAULT rttIoScanDir"/?.lc;"rttIoScanDir"/?.lua;"
 
 char *GetPrivateStringData(const char *name, char *buf, int buflen, const char *file);

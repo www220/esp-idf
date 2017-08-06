@@ -306,7 +306,7 @@ void rt_hw_usart_init()
     rt_hw_serial_register(&serial0, "uart0", 
         RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart0);
 #endif
-#ifdef RT_USING_UART1
+#ifdef RT_USING_UART2
 	periph_module_enable(PERIPH_UART1_MODULE);
     UART[uart1.num]->conf0.rxfifo_rst = 1;
     UART[uart1.num]->conf0.rxfifo_rst = 0;
@@ -347,10 +347,10 @@ void rt_hw_usart_init()
 	
     serial1.ops = &esp32_uart_ops;
     serial1.config = config;
-    rt_hw_serial_register(&serial1, "uart1", 
+    rt_hw_serial_register(&serial1, "uart2", 
         RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart1);
 #endif
-#ifdef RT_USING_UART2
+#ifdef RT_USING_UART1
 	periph_module_enable(PERIPH_UART2_MODULE);
     UART[uart2.num]->conf0.rxfifo_rst = 1;
     UART[uart2.num]->conf0.rxfifo_rst = 0;
@@ -395,7 +395,7 @@ void rt_hw_usart_init()
 	
     serial2.ops = &esp32_uart_ops;
     serial2.config = config;
-    rt_hw_serial_register(&serial2, "uart2", 
+    rt_hw_serial_register(&serial2, "uart1", 
         RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
 #endif
 }
