@@ -587,6 +587,10 @@ void rt_hw_board_init(void)
 
 	rt_thread_idle_sethook(rt_hw_idle_hook);
 	rt_thread_inited_sethook(thread_inited);
+
+	/* set cst */	
+    putenv("TZ=CST-8:00");
+    tzset();
 }
 
 #ifdef RT_USING_FINSH
@@ -639,6 +643,14 @@ int pin_val(int argc, char **argv)
 
 MSH_CMD_EXPORT_ALIAS(pin_cfg, pin_cfg, PIN Config.);
 MSH_CMD_EXPORT_ALIAS(pin_val, pin_val, PIN Read.);
+
+#include <sys/time.h>
+void cmd_date(int argc, char **argv)
+{
+    time_t now = time(RT_NULL);
+    rt_kprintf("%s\n", ctime(&now));
+}
+MSH_CMD_EXPORT_ALIAS(cmd_date, date, show date and time.)
 
 extern int lua_main (int argc, char **argv);
 MSH_CMD_EXPORT_ALIAS(lua_main, lua, LUA run engine.);
