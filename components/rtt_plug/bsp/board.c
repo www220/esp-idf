@@ -559,9 +559,7 @@ int rt_hw_eth_init(void)
 	return ret;
 }
 
-volatile int eth_wtdog = 0;
 volatile int eth_linkstatus = 0;
-volatile int wtdog_count = 0;
 volatile int sys_stauts = -1;
 volatile int ppp_linkstatus = 0;
 volatile int uptime_count = 0;

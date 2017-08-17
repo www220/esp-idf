@@ -39,9 +39,7 @@
 void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
 
-extern volatile int eth_wtdog;
 extern volatile int eth_linkstatus;
-extern volatile int wtdog_count;
 extern volatile int sys_stauts;
 extern volatile int ppp_linkstauts;
 extern volatile int uptime_count;
