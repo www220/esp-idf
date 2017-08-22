@@ -179,20 +179,53 @@ config IPC_TASK_STACK_SIZE
         It can be shrunk if you are sure that you do not use any custom
         IPC functionality.
 
-config NEWLIB_STDOUT_ADDCR
-    bool "Standard-out output adds carriage return before newline"
-    default y
+choice NEWLIB_STDOUT_LINE_ENDING
+    prompt "Line ending for UART output"
+    default NEWLIB_STDOUT_LINE_ENDING_CRLF
     help
-        Most people are used to end their printf strings with a newline. If this
-        is sent as is to the serial port, most terminal programs will only move the
-        cursor one line down, not also move it to the beginning of the line. This
-        is usually done by an added CR character. Enabling this will make the
-        standard output code automatically add a CR character before a LF.
+        This option allows configuring the desired line endings sent to UART
+        when a newline ('\n', LF) appears on stdout.
+        Three options are possible:
         
-        With this option enabled, C standard library functions which read from UART 
-        (like scanf) will convert "\r\n" character sequences back to "\n".
+        CRLF: whenever LF is encountered, prepend it with CR
+        
+        LF: no modification is applied, stdout is sent as is
+        
+        CR: each occurence of LF is replaced with CR
         
         This option doesn't affect behavior of the UART driver (drivers/uart.h).
+        
+config NEWLIB_STDOUT_LINE_ENDING_CRLF
+    bool "CRLF"
+config NEWLIB_STDOUT_LINE_ENDING_LF
+    bool "LF"
+config NEWLIB_STDOUT_LINE_ENDING_CR
+    bool "CR"
+endchoice
+
+choice NEWLIB_STDIN_LINE_ENDING
+    prompt "Line ending for UART input"
+    default NEWLIB_STDIN_LINE_ENDING_CR
+    help
+        This option allows configuring which input sequence on UART produces
+        a newline ('\n', LF) on stdin.
+        Three options are possible:
+        
+        CRLF: CRLF is converted to LF
+        
+        LF: no modification is applied, input is sent to stdin as is
+        
+        CR: each occurence of CR is replaced with LF
+        
+        This option doesn't affect behavior of the UART driver (drivers/uart.h).
+        
+config NEWLIB_STDIN_LINE_ENDING_CRLF
+    bool "CRLF"
+config NEWLIB_STDIN_LINE_ENDING_LF
+    bool "LF"
+config NEWLIB_STDIN_LINE_ENDING_CR
+    bool "CR"
+endchoice
 
 config NEWLIB_NANO_FORMAT
     bool "Enable 'nano' formatting options for printf/scanf family"
@@ -560,15 +593,19 @@ config ESP32_XTAL_FREQ
 
 endmenu
 
-menuconfig WIFI_ENABLED
-    bool "WiFi"
-    default y
+config NO_BLOBS
+    bool "No Binary Blobs"
+    depends on !BT_ENABLED
+    default n
     help
-       Select this option to enable WiFi stack and show the submenu with WiFi configuration choices.
+       If enabled, this disables the linking of binary libraries in the application build. Note
+       that after enabling this Wi-Fi/Bluetooth will not work.
+
+menu Wi-Fi
 
 config SW_COEXIST_ENABLE
     bool "Software controls WiFi/Bluetooth coexistence"
-    depends on WIFI_ENABLED && BT_ENABLED
+    depends on BT_ENABLED
     default n
     help
         If enabled, WiFi & Bluetooth coexistence is controlled by software rather than hardware.
@@ -578,7 +615,6 @@ config SW_COEXIST_ENABLE
 
 config ESP32_WIFI_STATIC_RX_BUFFER_NUM
     int "Max number of WiFi static RX buffers"
-    depends on WIFI_ENABLED
     range 2 25
     default 10
     help
@@ -590,7 +626,6 @@ config ESP32_WIFI_STATIC_RX_BUFFER_NUM
 
 config ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM
     int "Max number of WiFi dynamic RX buffers"
-    depends on WIFI_ENABLED
     range 0 128
     default 32
     help
@@ -606,7 +641,6 @@ config ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM
 
 choice ESP32_WIFI_TX_BUFFER
     prompt "Type of WiFi TX buffers"
-    depends on WIFI_ENABLED
     default ESP32_WIFI_DYNAMIC_TX_BUFFER
     help
         Select type of WiFi tx buffers and show the submenu with the number of WiFi tx buffers choice. 
@@ -626,13 +660,11 @@ endchoice
 
 config ESP32_WIFI_TX_BUFFER_TYPE
     int
-    depends on WIFI_ENABLED
     default 0 if ESP32_WIFI_STATIC_TX_BUFFER
     default 1 if ESP32_WIFI_DYNAMIC_TX_BUFFER
 
 config ESP32_WIFI_STATIC_TX_BUFFER_NUM
     int "Max number of WiFi static TX buffers"
-    depends on WIFI_ENABLED 
     depends on ESP32_WIFI_STATIC_TX_BUFFER
     range 16 64
     default 32
@@ -646,7 +678,6 @@ config ESP32_WIFI_STATIC_TX_BUFFER_NUM
 
 config ESP32_WIFI_DYNAMIC_TX_BUFFER_NUM
     int "Max number of WiFi dynamic TX buffers"
-    depends on WIFI_ENABLED 
     depends on ESP32_WIFI_DYNAMIC_TX_BUFFER
     range 16 64
     default 32
@@ -659,7 +690,6 @@ config ESP32_WIFI_DYNAMIC_TX_BUFFER_NUM
 
 config ESP32_WIFI_AMPDU_ENABLED
     bool "WiFi AMPDU"
-    depends on WIFI_ENABLED
     default y
     help
         Select this option to enable AMPDU feature
@@ -689,21 +719,14 @@ config ESP32_WIFI_RX_BA_WIN
 
 config ESP32_WIFI_NVS_ENABLED
     bool "WiFi NVS flash"
-    depends on WIFI_ENABLED
     default y
     help
         Select this option to enable WiFi NVS flash
 
-config PHY_ENABLED
-	bool
-	default y if WIFI_ENABLED || BT_ENABLED
-
 menu PHY
-	visible if PHY_ENABLED
 	
 config ESP32_PHY_CALIBRATION_AND_DATA_STORAGE
     bool "Do phy calibration and store calibration data in NVS"
-    depends on PHY_ENABLED
     default y
     help
         If this option is enabled, NVS will be initialized and calibration data will be loaded from there.
@@ -714,7 +737,6 @@ config ESP32_PHY_CALIBRATION_AND_DATA_STORAGE
 
 config ESP32_PHY_INIT_DATA_IN_PARTITION
     bool "Use a partition to store PHY init data"
-    depends on PHY_ENABLED
     default n
     help
         If enabled, PHY init data will be loaded from a partition.
@@ -733,15 +755,13 @@ config ESP32_PHY_MAX_WIFI_TX_POWER
     int "Max WiFi TX power (dBm)"
     range 0 20
     default 20
-    depends on PHY_ENABLED && WIFI_ENABLED
     help
         Set maximum transmit power for WiFi radio. Actual transmit power for high
         data rates may be lower than this setting.
 
 config ESP32_PHY_MAX_TX_POWER
 	int
-	depends on PHY_ENABLED
-	default 20 if !WIFI_ENABLED
-	default ESP32_PHY_MAX_WIFI_TX_POWER if WIFI_ENABLED
+	default ESP32_PHY_MAX_WIFI_TX_POWER
 
+endmenu
 endmenu
