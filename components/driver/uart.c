@@ -424,7 +424,7 @@ esp_err_t uart_set_rts(uart_port_t uart_num, int level)
     UART_CHECK((UART[uart_num]->conf1.rx_flow_en != 1), "disable hw flowctrl before using sw control", ESP_FAIL);
     UART_ENTER_CRITICAL(&uart_spinlock[uart_num]);
     UART[uart_num]->conf0.sw_rts = level & 0x1;
-    UART_ENTER_CRITICAL(&uart_spinlock[uart_num]);
+    UART_EXIT_CRITICAL(&uart_spinlock[uart_num]);
     return ESP_OK;
 }
 
@@ -433,7 +433,7 @@ esp_err_t uart_set_dtr(uart_port_t uart_num, int level)
     UART_CHECK((uart_num < UART_NUM_MAX), "uart_num error", ESP_FAIL);
     UART_ENTER_CRITICAL(&uart_spinlock[uart_num]);
     UART[uart_num]->conf0.sw_dtr = level & 0x1;
-    UART_ENTER_CRITICAL(&uart_spinlock[uart_num]);
+    UART_EXIT_CRITICAL(&uart_spinlock[uart_num]);
     return ESP_OK;
 }
 
@@ -616,7 +616,6 @@ static void uart_rx_intr_handler_default(void *param)
                 uart_reg->int_clr.rxfifo_tout = 1;
                 uart_reg->int_clr.rxfifo_full = 1;
                 UART_EXIT_CRITICAL_ISR(&uart_spinlock[uart_num]);
-                uart_event.type = UART_DATA;
                 uart_event.size = rx_fifo_len;
                 //If we fail to push data to ring buffer, we will have to stash the data, and send next time.
                 //Mainly for applications that uses flow control or small ring buffer.

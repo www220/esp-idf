@@ -179,6 +179,20 @@ config IPC_TASK_STACK_SIZE
         It can be shrunk if you are sure that you do not use any custom
         IPC functionality.
 
+config TIMER_TASK_STACK_SIZE
+    int "High-resolution timer task stack size"
+    default 4096
+    range 2048 65536
+    help
+        Configure the stack size of esp_timer/ets_timer task. This task is used
+        to dispatch callbacks of timers created using ets_timer and esp_timer
+        APIs. If you are seing stack overflow errors in timer task, increase
+        this value.
+        
+        Note that this is not the same as FreeRTOS timer task. To configure
+        FreeRTOS timer task size, see "FreeRTOS timer task stack size" option
+        in "FreeRTOS" menu. 
+
 choice NEWLIB_STDOUT_LINE_ENDING
     prompt "Line ending for UART output"
     default NEWLIB_STDOUT_LINE_ENDING_CRLF
@@ -253,6 +267,7 @@ choice CONSOLE_UART
     default CONSOLE_UART_DEFAULT
     help
         Select whether to use UART for console output (through stdout and stderr).
+        
         - Default is to use UART0 on pins GPIO1(TX) and GPIO3(RX).
         - If "Custom" is selected, UART0 or UART1 can be chosen,
           and any pins can be selected.
@@ -315,21 +330,16 @@ config ULP_COPROC_ENABLED
         If this option is enabled, further coprocessor configuration will appear in the Components menu.
 
 config ULP_COPROC_RESERVE_MEM
-    int "RTC slow memory reserved for coprocessor"
-    default 512
-    range 32 8192
-    depends on ULP_COPROC_ENABLED
+    int
+    prompt "RTC slow memory reserved for coprocessor" if ULP_COPROC_ENABLED
+    default 512 if ULP_COPROC_ENABLED
+    range 32 8192 if ULP_COPROC_ENABLED
+    default 0 if !ULP_COPROC_ENABLED
+    range 0 0 if !ULP_COPROC_ENABLED
     help
         Bytes of memory to reserve for ULP coprocessor firmware & data.
 
         Data is reserved at the beginning of RTC slow memory.
-
-# Set CONFIG_ULP_COPROC_RESERVE_MEM to 0 if ULP is disabled
-config ULP_COPROC_RESERVE_MEM
-    int
-    default 0
-    depends on !ULP_COPROC_ENABLED
-
 
 choice ESP32_PANIC
     prompt "Panic handler behaviour"
@@ -542,6 +552,7 @@ config ESP32_RTC_CLK_CAL_CYCLES
         
         When this option is set to 0, clock calibration will not be performed at
         startup, and approximate clock frequencies will be assumed:
+
         - 150000 Hz if internal RC oscillator is used as clock source
         - 32768 Hz if the 32k crystal oscillator is used
 
@@ -565,11 +576,13 @@ config ESP32_DEEP_SLEEP_WAKEUP_DELAY
 
 choice ESP32_XTAL_FREQ_SEL
     prompt "Main XTAL frequency"
-    default ESP32_XTAL_FREQ_AUTO
+    default ESP32_XTAL_FREQ_40
     help
         ESP32 currently supports the following XTAL frequencies:
-            - 26 MHz
-            - 40 MHz
+
+        - 26 MHz
+        - 40 MHz
+
         Startup code can automatically estimate XTAL frequency. This feature
         uses the internal 8MHz oscillator as a reference. Because the internal
         oscillator frequency is temperature dependent, it is not recommended
@@ -591,7 +604,17 @@ config ESP32_XTAL_FREQ
     default 40 if ESP32_XTAL_FREQ_40
     default 26 if ESP32_XTAL_FREQ_26
 
-endmenu
+config DISABLE_BASIC_ROM_CONSOLE
+    bool "Permanently disable BASIC ROM Console"
+    default n
+    help
+        If set, the first time the app boots it will disable the BASIC ROM Console
+        permanently (by burning an efuse).
+
+        Otherwise, the BASIC ROM Console starts on reset if no valid bootloader is
+        read from the flash.
+
+        (Enabling secure boot also disables the BASIC ROM Console by default.)
 
 config NO_BLOBS
     bool "No Binary Blobs"
@@ -600,6 +623,20 @@ config NO_BLOBS
     help
        If enabled, this disables the linking of binary libraries in the application build. Note
        that after enabling this Wi-Fi/Bluetooth will not work.
+
+config ESP_TIMER_PROFILING
+	bool "Enable esp_timer profiling features"
+	depends on MAKING_ESP_TIMER_A_PUBLIC_API
+	default n
+	help
+		If enabled, esp_timer_dump will dump information such as number of times
+		the timer was started, number of times the timer has triggered, and the
+		total time it took for the callback to run.
+		This option has some effect on timer performance and the amount of memory
+		used for timer storage, and should only be used for debugging/testing
+		purposes.
+
+endmenu  # ESP32-Specific
 
 menu Wi-Fi
 
@@ -723,8 +760,10 @@ config ESP32_WIFI_NVS_ENABLED
     help
         Select this option to enable WiFi NVS flash
 
-menu PHY
-	
+endmenu  # Wi-Fi
+
+menu Phy
+
 config ESP32_PHY_CALIBRATION_AND_DATA_STORAGE
     bool "Do phy calibration and store calibration data in NVS"
     default y
@@ -763,5 +802,4 @@ config ESP32_PHY_MAX_TX_POWER
 	int
 	default ESP32_PHY_MAX_WIFI_TX_POWER
 
-endmenu
-endmenu
+endmenu  # PHY

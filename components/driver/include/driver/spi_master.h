@@ -30,7 +30,7 @@ extern "C"
 
 #define SPI_DEVICE_TXBIT_LSBFIRST          (1<<0)  ///< Transmit command/address/data LSB first instead of the default MSB first
 #define SPI_DEVICE_RXBIT_LSBFIRST          (1<<1)  ///< Receive data LSB first instead of the default MSB first
-#define SPI_DEVICE_BIT_LSBFIRST            (SPI_TXBIT_LSBFIRST|SPI_RXBIT_LSBFIRST); ///< Transmit and receive LSB first
+#define SPI_DEVICE_BIT_LSBFIRST            (SPI_DEVICE_TXBIT_LSBFIRST|SPI_DEVICE_RXBIT_LSBFIRST); ///< Transmit and receive LSB first
 #define SPI_DEVICE_3WIRE                   (1<<2)  ///< Use MOSI (=spid) for both sending and receiving data
 #define SPI_DEVICE_POSITIVE_CS             (1<<3)  ///< Make CS positive during a transaction instead of negative
 #define SPI_DEVICE_HALFDUPLEX              (1<<4)  ///< Transmit data before receiving it, instead of simultaneously
@@ -71,12 +71,14 @@ typedef struct {
  */
 struct spi_transaction_t {
     uint32_t flags;                 ///< Bitwise OR of SPI_TRANS_* flags
-    uint16_t command;               ///< Command data, of which the length is set in the command_bits of spi_device_interface_config_t.
-    uint64_t addr;                  ///< Address data, of which the length is set in the address_bits of spi_device_interface_config_t.
-                                    ///< <b>NOTE: this field is re-written to be used in a new way.</b> 
-                                    ///< - Example: write 0x123400 and address_bits=24 to send address of 0x12, 0x34, 0x00.  
+    uint16_t cmd;                   ///< Command data, of which the length is set in the ``command_bits`` of spi_device_interface_config_t.
+                                    ///< <b>NOTE: this field, used to be "command" in ESP-IDF 2.1 and before, is re-written to be used in a new way in ESP-IDF 3.0.</b>
+                                    ///< - Example: write 0x0123 and command_bits=12 to send command 0x12, 0x3_ (in previous version, you may have to write 0x3_12).
+    uint64_t addr;                  ///< Address data, of which the length is set in the ``address_bits`` of spi_device_interface_config_t.
+                                    ///< <b>NOTE: this field, used to be "address" in ESP-IDF 2.1 and before, is re-written to be used in a new way in ESP-IDF3.0.</b> 
+                                    ///< - Example: write 0x123400 and address_bits=24 to send address of 0x12, 0x34, 0x00 (in previous version, you may have to write 0x12340000).  
     size_t length;                  ///< Total data length, in bits
-    size_t rxlength;                ///< Total data length received, should be not greater than ``length`` in full-duplex mode. (0 defaults this to the value of ``length``)
+    size_t rxlength;                ///< Total data length received, should be not greater than ``length`` in full-duplex mode (0 defaults this to the value of ``length``).
     void *user;                     ///< User-defined variable. Can be used to store eg transaction ID.
     union {
         const void *tx_buffer;      ///< Pointer to transmit buffer, or NULL for no MOSI phase
@@ -86,7 +88,7 @@ struct spi_transaction_t {
         void *rx_buffer;            ///< Pointer to receive buffer, or NULL for no MISO phase. Written by 4 bytes-unit if DMA is used.
         uint8_t rx_data[4];         ///< If SPI_USE_RXDATA is set, data is received directly to this variable
     };
-};
+} ;        //the rx data should start from a 32-bit aligned address to get around dma issue.
 
 
 typedef struct spi_device_t* spi_device_handle_t;  ///< Handle for a device on a SPI bus
@@ -204,8 +206,7 @@ esp_err_t spi_device_get_trans_result(spi_device_handle_t handle, spi_transactio
  * using spi_device_get_trans_result.
  *
  * @param handle Device handle obtained using spi_host_add_dev
- * @param trans_desc Pointer to variable able to contain a pointer to the description of the 
- *                   transaction that is executed
+ * @param trans_desc Description of transaction to execute
  * @return 
  *         - ESP_ERR_INVALID_ARG   if parameter is invalid
  *         - ESP_OK                on success

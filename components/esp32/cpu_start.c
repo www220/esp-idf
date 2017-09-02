@@ -62,7 +62,9 @@
 #include "esp_panic.h"
 #include "esp_core_dump.h"
 #include "esp_app_trace.h"
+#include "esp_efuse.h"
 #include "esp_clk.h"
+#include "esp_timer.h"
 #include "trax.h"
 
 #define STRINGIFY(s) STRINGIFY2(s)
@@ -91,6 +93,10 @@ extern void (*__init_array_end)(void);
 extern volatile int port_xSchedulerRunning[2];
 
 static const char* TAG = "cpu_start";
+
+struct object { long placeholder[ 10 ]; };
+void __register_frame_info (const void *begin, struct object *ob);
+extern char __eh_frame[];
 
 /*
  * We arrive here after the bootloader finished loading the program from flash. The hardware is mostly uninitialized,
@@ -237,6 +243,7 @@ void start_cpu0_default(void)
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
 #endif
     esp_clk_init();
+    esp_perip_clk_init();
     intr_matrix_clear();
 #ifndef CONFIG_CONSOLE_UART_NONE
     uart_div_modify(CONFIG_CONSOLE_UART_NUM, (rtc_clk_apb_freq_get() << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
@@ -244,8 +251,10 @@ void start_cpu0_default(void)
 #if CONFIG_BROWNOUT_DET
     esp_brownout_init();
 #endif
+#if CONFIG_DISABLE_BASIC_ROM_CONSOLE
+    esp_efuse_disable_basic_rom_console();
+#endif
     rtc_gpio_force_hold_dis_all();
-    esp_setup_time_syscalls();
     esp_vfs_dev_uart_register();
     esp_reent_init(_GLOBAL_REENT);
 #ifndef CONFIG_CONSOLE_UART_NONE
@@ -258,6 +267,8 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stdout = (FILE*) &__sf_fake_stdout;
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
+    esp_timer_init();
+    esp_set_time_from_rtc();
 #if CONFIG_ESP32_APPTRACE_ENABLE
     esp_err_t err = esp_apptrace_init();
     if (err != ESP_OK) {
@@ -333,6 +344,9 @@ void start_cpu1_default(void)
 
 static void do_global_ctors(void)
 {
+    static struct object ob;
+    __register_frame_info( __eh_frame, &ob );
+
     void (**p)(void);
     for (p = &__init_array_end - 1; p >= &__init_array_start; --p) {
         (*p)();

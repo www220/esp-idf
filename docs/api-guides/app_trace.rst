@@ -30,7 +30,7 @@ The library supports two modes of operation:
 
 **Post-mortem mode**. This is the default mode. The mode does not need interaction from the host side. In this mode tracing module does not check whether host has read all the data from *HW UP BUFFER* buffer and overwrites old data with the new ones. This mode is useful when only the latest trace data are interesting to the user, e.g. for analyzing program's behaviour just before the crash. Host can read the data later on upon user request, e.g. via special OpenOCD command in case of working via JTAG interface.
 
-**Streaming mode.** Tracing module enters this mode when host connects to ESP32. In this mode before writing new data to *HW UP BUFFER* tracing module checks that there is enough space in it and if necessary waits for the host to read data and free enough memory. Maximum waiting time is controled via timeout values passed by users to corresponding API routines. So when application tries to write data to trace buffer using finite value of the maximum waiting time it is possible situation that this data will be dropped. Especially this is true for tracing from time critical code (ISRs, OS scheduler code etc.) when infinite timeouts can lead to system malfunction. In order to avoid loss of such critical data developers can enable additional data buffering via menuconfig option *Component config > Application Level Tracing > Size of the pending data buffer* (``CONFIG_ESP32_APPTRACE_PENDING_DATA_SIZE_MAX``). This macro specifies the size of data which can be buffered in above conditions. The option can also help to overcome situation when data transfer to the host is temporarily slowed down, e.g due to USB bus congestions etc. But it will not help when average bitrate of trace data stream exceeds HW interface capabilities.
+**Streaming mode.** Tracing module enters this mode when host connects to ESP32. In this mode before writing new data to *HW UP BUFFER* tracing module checks that there is enough space in it and if necessary waits for the host to read data and free enough memory. Maximum waiting time is controled via timeout values passed by users to corresponding API routines. So when application tries to write data to trace buffer using finite value of the maximum waiting time it is possible situation that this data will be dropped. Especially this is true for tracing from time critical code (ISRs, OS scheduler code etc.) when infinite timeouts can lead to system malfunction. In order to avoid loss of such critical data developers can enable additional data buffering via menuconfig option :ref:`CONFIG_ESP32_APPTRACE_PENDING_DATA_SIZE_MAX`. This macro specifies the size of data which can be buffered in above conditions. The option can also help to overcome situation when data transfer to the host is temporarily slowed down, e.g due to USB bus congestions etc. But it will not help when average bitrate of trace data stream exceeds HW interface capabilities.
 
 
 Configuration Options and Dependencies
@@ -39,16 +39,16 @@ Configuration Options and Dependencies
 Using of this feature depends on two components:
 
 1. **Host side:** Application tracing is done over JTAG, so it needs OpenOCD to be set up and running on host machine. For instructions how to set it up, please, see :doc:`JTAG Debugging <../api-guides/jtag-debugging/index>` for details.
-2. **Target side:** Application tracing functionality can be enabled by ``CONFIG_ESP32_APPTRACE_ENABLE`` macro via menuconfig. This option enables the module and makes tracing API available for users. Actually there is menu *Component config > Application Level Tracing* which allows selecting destination for the trace data (HW interface for transport). So choosing one of the destinations automatically enables ``CONFIG_ESP32_APPTRACE_ENABLE`` option.
+2. **Target side:** Application tracing functionality can be enabled in menuconfig. *Component config > Application Level Tracing* menu allows selecting destination for the trace data (HW interface for transport). Choosing any of the destinations automatically enables ``CONFIG_ESP32_APPTRACE_ENABLE`` option.
 
 .. note::
 
-    In order to achieve higher data rates and minimize number of dropped packets it is recommended to modify JTAG adapter working frequency in respective OpenOCD config file, e.g. ``modules/esp-wroom-32.cfg``, if you are using ESP-WROOM-32 module. For example on ESP-WROVER-KIT board the maximum tested stable speed is 26MHz, so for this board you can update the following statement in your configuration file ``adapter_khz 26000``, instead of the default ``adapter_khz 20000``. Actually maximum stable JTAG frequency can depend on the host system configuration. In general JTAG clock should not exceed APB clock / 4.
+    In order to achieve higher data rates and minimize number of dropped packets it is recommended to optimize setting of JTAG clock frequency, so it is at maximum and still provides stable operation of JTAG, see :ref:`jtag-debugging-tip-optimize-jtag-speed`.
 
 There are two additional menuconfig options not mentioned above:
 
-1.	*Component config > Application Level Tracing > Threshold for flushing last trace data to host on panic* (``CONFIG_ESP32_APPTRACE_POSTMORTEM_FLUSH_TRAX_THRESH``). This option is necessary due to the nature of working over JTAG. In that mode trace data are exposed to the host in 16KB blocks. In post-mortem mode when one block is filled it is exposed to the host and the previous one becomes unavailable. In other words trace data are overwritten in 16KB granularity. On panic the latest data from the current input block are exposed to host and host can read them for post-analysis. It can happen that system panic occurs when there are very small amount of data which are not exposed to the host yet. In this case the previous 16KB of collected data will be lost and host will see the latest, but very small piece of the trace. It can be insufficient to diagnose the problem. This menuconfig option allows avoiding such situations. It controls the threshold for flushing data in case of panic. For example user can decide that it needs not less then 512 bytes of the recent trace data, so if there is less then 512 bytes of pending data at the moment of panic they will not be flushed and will not overwrite previous 16KB. The option is only meaningful in post-mortem mode and when working over JTAG.
-2.	*Component config > Application Level Tracing > Timeout for flushing last trace data to host on panic* (``CONFIG_ESP32_APPTRACE_ONPANIC_HOST_FLUSH_TMO``). The option is only meaningful in streaming mode and controls the maximum time tracing module will wait for the host to read the last data in case of panic.
+1.	*Threshold for flushing last trace data to host on panic* (:ref:`CONFIG_ESP32_APPTRACE_POSTMORTEM_FLUSH_TRAX_THRESH`). This option is necessary due to the nature of working over JTAG. In that mode trace data are exposed to the host in 16KB blocks. In post-mortem mode when one block is filled it is exposed to the host and the previous one becomes unavailable. In other words trace data are overwritten in 16KB granularity. On panic the latest data from the current input block are exposed to host and host can read them for post-analysis. It can happen that system panic occurs when there are very small amount of data which are not exposed to the host yet. In this case the previous 16KB of collected data will be lost and host will see the latest, but very small piece of the trace. It can be insufficient to diagnose the problem. This menuconfig option allows avoiding such situations. It controls the threshold for flushing data in case of panic. For example user can decide that it needs not less then 512 bytes of the recent trace data, so if there is less then 512 bytes of pending data at the moment of panic they will not be flushed and will not overwrite previous 16KB. The option is only meaningful in post-mortem mode and when working over JTAG.
+2.	*Timeout for flushing last trace data to host on panic* (:ref:`CONFIG_ESP32_APPTRACE_ONPANIC_HOST_FLUSH_TMO`). The option is only meaningful in streaming mode and controls the maximum time tracing module will wait for the host to read the last data in case of panic.
 
 
 How to use this library
@@ -245,6 +245,8 @@ Command usage examples:
 	There is an option to configure target to halt after reset on start of scheduler. To do so, go to menuconfig and enable option *Stop program on scheduler start when JTAG/OCD is detected* under *Component config > FreeRTOS*. 
 
 
+.. _app_trace-logging-to-host:
+
 Logging to Host
 ^^^^^^^^^^^^^^^
 
@@ -279,28 +281,7 @@ How To Use It
 
 In order to use logging via trace module user needs to perform the following steps:
 
-1. On target side special vprintf-like function needs to be installed. As it was mentioned earlier this function is ``esp_apptrace_vprintf``. It sends log data to the host. Example code is shown below.
-
-.. code-block:: c
-
-    #include "esp_app_trace.h"
-    ...
-    void app_main()
-    {
-        // set log vprintf handler
-        esp_log_set_vprintf(esp_apptrace_vprintf);
-        ...
-        // user code using ESP_LOGx starts here
-        // all data passed to ESP_LOGx are sent to host
-        ...
-        // restore log vprintf handler
-        esp_log_set_vprintf(vprintf);
-        // flush last data to host
-        esp_apptrace_flush(ESP_APPTRACE_DEST_TRAX, 100000 /*tmo in us*/);
-        ESP_LOGI(TAG, "Tracing is finished."); // this will be printed out to UART
-        while (1);
-    }
-
+1. On target side special vprintf-like function needs to be installed. As it was mentioned earlier this function is ``esp_apptrace_vprintf``. It sends log data to the host. Example code is provided in :example:`system/app_trace_to_host`.
 2. Follow instructions in items 2-5 in `Application Specific Tracing`_.
 3. To print out collected log records, run the following command in terminal: ``$IDF_PATH/tools/esp_app_trace/logtrace_proc.py /path/to/trace/file /path/to/program/elf/file``.
 
@@ -340,9 +321,9 @@ Another useful IDF feature built on top of application tracing library is the sy
 How To Use It
 """""""""""""
 
-Support for this feature is enabled by *Component config > Application Level Tracing > FreeRTOS SystemView Tracing* (``CONFIG_SYSVIEW_ENABLE``) menuconfig option. There are several other options enabled under the same menu:
+Support for this feature is enabled by *Component config > Application Level Tracing > FreeRTOS SystemView Tracing* (:ref:`CONFIG_SYSVIEW_ENABLE`) menuconfig option. There are several other options enabled under the same menu:
 
-1. *ESP32 timer to use as SystemView timestamp source* (``CONFIG_SYSVIEW_TS_SOURCE``) selects the source of timestamps for SystemView events. In single core mode timestamps are generated using ESP32 internal cycle counter running at maximum 240 Mhz (~4 ns granularity). In dual-core mode external timer working at 40Mhz is used, so timestamp granularity is 25 ns.
+1. *ESP32 timer to use as SystemView timestamp source* (:ref:`CONFIG_SYSVIEW_TS_SOURCE`) selects the source of timestamps for SystemView events. In single core mode timestamps are generated using ESP32 internal cycle counter running at maximum 240 Mhz (~4 ns granularity). In dual-core mode external timer working at 40Mhz is used, so timestamp granularity is 25 ns.
 2. Individually enabled or disabled collection of SystemView events (``CONFIG_SYSVIEW_EVT_XXX``):
 
     - Trace Buffer Overflow Event
@@ -401,11 +382,11 @@ Command usage examples:
 
 .. highlight:: none
 
-1.	Collect SystemView tracing data to files "pro-cpu.str" and "pro-cpu.str". The files will be saved in "openocd-esp32" directory.
+1.	Collect SystemView tracing data to files "pro-cpu.SVDat" and "pro-cpu.SVDat". The files will be saved in "openocd-esp32" directory.
 
 	::
 
-		esp32 sysview start file://pro-cpu.str file://app-cpu.str
+		esp32 sysview start file://pro-cpu.SVDat file://app-cpu.SVDat
 
 	The tracing data will be retrieved and saved in non-blocking mode. To stop data this process enter ``esp32 apptrace stop`` command on OpenOCD telnet prompt, Optionally pressing Ctrl+C in OpenOCD window.
 
@@ -413,7 +394,7 @@ Command usage examples:
 
 	::
 
-		esp32 sysview start file://pro-cpu.str file://app-cpu.str 0 -1 -1
+		esp32 sysview start file://pro-cpu.SVDat file://app-cpu.SVDat 0 -1 -1
 
 	OpenOCD telnet command line prompt will not be available until tracing is stopped. To stop tracing, press Ctrl+C in OpenOCD window.
 
