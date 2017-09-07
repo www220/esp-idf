@@ -46,6 +46,7 @@ extern volatile int uptime_count;
 extern unsigned char PZ[4];
 extern char RTT_USER[16];
 extern char RTT_PASS[36];
+extern unsigned long long RTT_PRJNO;
 
 #define rttIoScanDir "/spi/ioscan"
 #define rttLogDir "/spi/log"

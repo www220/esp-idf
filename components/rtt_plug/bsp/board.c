@@ -567,6 +567,7 @@ volatile int uptime_count = 0;
 unsigned char PZ[4] = {0};
 char RTT_USER[16] = {"admin"};
 char RTT_PASS[36] = {"21232f297a57a5a743894a0e4a801fc3"};
+unsigned long long RTT_PRJNO = 0;
 
 void rt_hw_board_init(void)
 {
