@@ -62,7 +62,7 @@ int linenoise_getline( int id, char* buffer, int maxinput, const char* prompt )
 {
     rt_kprintf( prompt );
 	
-	rt_device_t shell = rt_device_find(FINSH_DEVICE_NAME);
+	rt_device_t shell = rt_console_get_device();
 	if (shell == NULL) return -1;
 	if (buffer == NULL || maxinput <= 1) return -1;
 	

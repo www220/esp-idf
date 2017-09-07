@@ -34,10 +34,11 @@
 #define RT_USING_UART2
 
 #define CONSOLE_DEVICE "uart0"
-#define FINSH_DEVICE_NAME "uart0"
+#define FINSH_DEVICE_NAME "telnet"
 
 void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
+int rt_hw_telnet_init(void);
 
 extern volatile int eth_linkstatus;
 extern volatile int sys_stauts;

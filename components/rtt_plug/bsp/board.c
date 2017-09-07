@@ -559,6 +559,229 @@ int rt_hw_eth_init(void)
 	return ret;
 }
 
+struct rb
+{
+    rt_uint16_t read_index, write_index;
+    rt_uint8_t *buffer_ptr;
+    rt_uint16_t buffer_size;
+};
+struct telnet_device
+{
+    struct rt_device device;
+    struct rt_mutex mutex;
+    struct rb rx_buf;
+    struct rb tx_buf;
+};
+struct telnet_device telnet;
+
+/* 一个环形buffer的实现 */
+/* 初始化环形buffer，size指的是buffer的大小。注：这里并没对数据地址对齐做处理 */
+static void rb_init(struct rb* rb, rt_uint8_t *pool, rt_uint16_t size)
+{
+    RT_ASSERT(rb != RT_NULL);
+
+    /* 对读写指针清零*/
+    rb->read_index = rb->write_index = 0;
+
+    /* 环形buffer的内存数据块 */
+    rb->buffer_ptr = pool;
+    rb->buffer_size = size;
+}
+
+/* 向环形buffer中写入一个字符 */
+static rt_size_t rb_putchar(struct rb* rb, const rt_uint8_t ch)
+{
+    rt_uint16_t next;
+
+    /* 判断是否有多余的空间 */
+    next = rb->write_index + 1;
+    if (next >= rb->buffer_size) next = 0;
+
+    if (next == rb->read_index) return 0;
+
+    /* 放入字符 */
+    rb->buffer_ptr[rb->write_index] = ch;
+    rb->write_index = next;
+
+    return 1;
+}
+
+/* 从环形buffer中读出数据 */
+static rt_size_t rb_get(struct rb* rb, rt_uint8_t *ptr, rt_uint16_t length)
+{
+    rt_size_t size;
+
+    /* 判断是否有足够的数据 */
+    if (rb->read_index > rb->write_index)
+        size = rb->buffer_size - rb->read_index + rb->write_index;
+    else
+        size = rb->write_index - rb->read_index;
+
+    /* 没有足够的数据 */
+    if (size == 0) return 0;
+
+    /* 数据不够指定的长度，取环形buffer中实际的长度 */
+    if (size < length) length = size;
+
+    if (rb->read_index > rb->write_index)
+    {
+        if (rb->buffer_size - rb->read_index > length)
+        {
+            /* read_index的数据足够多，直接复制 */
+			if (ptr)
+				rt_memcpy(ptr, &rb->buffer_ptr[rb->read_index], length);
+            rb->read_index += length;
+        }
+        else
+        {
+            /* read_index的数据不够，需要分段复制 */
+			if (ptr)
+			{
+	            rt_memcpy(ptr, &rb->buffer_ptr[rb->read_index],
+	                   rb->buffer_size - rb->read_index);
+	            rt_memcpy(&ptr[rb->buffer_size - rb->read_index], &rb->buffer_ptr[0],
+	                   length - rb->buffer_size + rb->read_index);
+			}
+            rb->read_index = length - rb->buffer_size + rb->read_index;
+        }
+    }
+    else
+    {
+        /* read_index要比write_index小，总的数据量够（前面已经有总数据量的判断），直接复制出数据 */
+		if (ptr)
+	        rt_memcpy(ptr, &rb->buffer_ptr[rb->read_index], length);
+        rb->read_index += length;
+    }
+
+    return length;
+}
+
+/* RT-Thread Device Driver Interface */
+static rt_err_t telnet_init(rt_device_t dev)
+{
+    return RT_EOK;
+}
+
+static rt_err_t telnet_open(rt_device_t dev, rt_uint16_t oflag)
+{
+    return RT_EOK;
+}
+
+static rt_err_t telnet_close(rt_device_t dev)
+{
+    return RT_EOK;
+}
+
+static rt_size_t telnet_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
+{
+    rt_size_t result;
+
+    /* read from rx ring buffer */
+    rt_mutex_take(&telnet.mutex, RT_WAITING_FOREVER);
+    result = rb_get(&telnet.rx_buf, buffer, size);
+    rt_mutex_release(&telnet.mutex);
+
+    return result;
+}
+
+static rt_size_t telnet_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t size)
+{
+    rt_size_t i,result = 0;
+    rt_uint8_t *buf = (rt_uint8_t *)buffer;
+
+    /* write to tx ring buffer */
+    rt_mutex_take(&telnet.mutex, RT_WAITING_FOREVER);
+    for (i=0; i<size; i++)
+    {
+        if (buf[i] == '\n')
+        {
+            char ch = '\r';
+            if (rb_putchar(&telnet.tx_buf,ch) == 0)
+            {
+                rb_get(&telnet.tx_buf, NULL, 128);
+                if (rb_putchar(&telnet.tx_buf,ch) == 0)
+                    break;
+            }
+        }
+        if (rb_putchar(&telnet.tx_buf,buf[i]) == 0)
+        {
+            rb_get(&telnet.tx_buf, NULL, 128);
+			if (rb_putchar(&telnet.tx_buf,buf[i]) == 0)
+				break;
+        }
+        result++;
+    }
+    rt_mutex_release(&telnet.mutex);
+
+    return result;
+}
+
+static rt_err_t telnet_control(rt_device_t dev, rt_uint8_t cmd, void *args)
+{
+    return RT_EOK;
+}
+
+rt_size_t telnet_recv(rt_device_t dev, rt_off_t pos, void* buffer, rt_size_t size)
+{
+    rt_size_t result;
+
+    /* read from tx ring buffer */
+    rt_mutex_take(&telnet.mutex, RT_WAITING_FOREVER);
+    result = rb_get(&telnet.tx_buf, buffer, size);
+    rt_mutex_release(&telnet.mutex);
+
+    return result;
+}
+
+rt_size_t telnet_send(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t size)
+{
+    rt_size_t i,result = 0;
+    rt_uint8_t *buf = (rt_uint8_t *)buffer;
+
+    /* write to rx ring buffer */
+    rt_mutex_take(&telnet.mutex, RT_WAITING_FOREVER);
+    for (i=0; i<size; i++)
+    {
+        if (rb_putchar(&telnet.rx_buf,buf[i]) == 0)
+        {
+            rb_get(&telnet.rx_buf, NULL, 128);
+			if (rb_putchar(&telnet.rx_buf,buf[i]) == 0)
+				break;
+        }
+        result++;
+    }
+    rt_mutex_release(&telnet.mutex);
+
+	/* indicate there are reception data */
+    if ((result > 0) && (telnet.device.rx_indicate != RT_NULL))
+        telnet.device.rx_indicate(&telnet.device, result);
+    return result;
+}
+
+int rt_hw_telnet_init(void)
+{
+    rt_memset(&telnet, 0, sizeof(telnet));
+    rb_init(&telnet.rx_buf, rt_malloc(1024), 1024);
+    rb_init(&telnet.tx_buf, rt_malloc(4096), 4096);
+    rt_mutex_init(&telnet.mutex, "telnet", RT_IPC_FLAG_FIFO);
+
+    /* register telnet device */
+    telnet.device.type     = RT_Device_Class_Char;
+    telnet.device.init     = telnet_init;
+    telnet.device.open     = telnet_open;
+    telnet.device.close    = telnet_close;
+    telnet.device.read     = telnet_read;
+    telnet.device.write    = telnet_write;
+    telnet.device.control  = telnet_control;
+
+    /* no private */
+    telnet.device.user_data = &telnet;
+
+    /* register telnet device */
+    rt_device_register(&telnet.device, "telnet", RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_STREAM);
+    return ESP_OK;
+}
+
 volatile int eth_linkstatus = 0;
 volatile int sys_stauts = -1;
 volatile int ppp_linkstatus = 0;
@@ -578,6 +801,11 @@ void rt_hw_board_init(void)
 	gpio_set_level(GPIO_NUM_15, 1);
 	gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
 	gpio_matrix_out(GPIO_NUM_15, SIG_GPIO_OUT_IDX, 0, 0);
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_35)) rtc_gpio_deinit(GPIO_NUM_35);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_35], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_35, GPIO_PULLUP_ONLY);
+	gpio_set_direction(GPIO_NUM_35, GPIO_MODE_INPUT);
+	gpio_matrix_out(GPIO_NUM_35, SIG_GPIO_OUT_IDX, 0, 0);
     /* initialize uart */
     rt_hw_usart_init();
 #ifdef RT_USING_CONSOLE

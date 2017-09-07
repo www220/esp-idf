@@ -518,7 +518,7 @@ void vEventGroupDelete( EventGroupHandle_t xEventGroup )
 #ifdef SHOW_EVT_DEBUG_INFO
 	ets_printf("vEventGroupDelete cur:%s name:%s\n",
 				(rt_current_thread)?(rt_current_thread->name):("NULL"),
-				obj->name);
+				obj->parent.parent.name);
 #endif
 	rt_event_delete(obj);
 }
@@ -529,7 +529,7 @@ EventBits_t xEventGroupSetBits( EventGroupHandle_t xEventGroup, const EventBits_
 #ifdef SHOW_EVT_DEBUG_INFO
     ets_printf("xEventGroupSetBits cur:%s name:%s bits:%x ret:%d\n",
                 (rt_current_thread)?(rt_current_thread->name):("NULL"),
-                obj->parent.name,uxBitsToSet,err);
+                obj->parent.parent.name,uxBitsToSet,err);
 #endif
 	return (err!=RT_EOK)?0:obj->set;
 }
@@ -541,7 +541,7 @@ EventBits_t xEventGroupClearBits( EventGroupHandle_t xEventGroup, const EventBit
 #ifdef SHOW_EVT_DEBUG_INFO
     ets_printf("xEventGroupClearBits cur:%s name:%s bits:%x ret:%d\n",
                 (rt_current_thread)?(rt_current_thread->name):("NULL"),
-                obj->parent.name,uxBitsToClear,err);
+                obj->parent.parent.name,uxBitsToClear,err);
 #endif
 	return (err!=RT_EOK)?0:recved;
 }
@@ -560,7 +560,7 @@ EventBits_t xEventGroupWaitBits( EventGroupHandle_t xEventGroup, const EventBits
 #ifdef SHOW_EVT_DEBUG_INFO
     ets_printf("xEventGroupWaitBits cur:%s name:%s bits:%x ret:%d\n",
                 (rt_current_thread)?(rt_current_thread->name):("NULL"),
-                obj->parent.name,uxBitsToWaitFor,err);
+                obj->parent.parent.name,uxBitsToWaitFor,err);
 #endif
 	return (err!=RT_EOK)?0:recved;
 }

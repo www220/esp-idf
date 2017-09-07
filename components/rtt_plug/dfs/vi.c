@@ -351,7 +351,6 @@ static void bb_show_usage(void)
     printf("Usage: vi [FILE]\n");
 }
 
-extern rt_device_t rt_console_get_device(void);
 static int wait_read(int fd, void *buf, size_t len, int timeout)
 {
     int ret = 0;
