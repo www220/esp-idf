@@ -262,7 +262,7 @@ static struct esp32_uart uart2 = { UART_NUM_2, UART_INTR_NUM_2 };
 void rt_hw_usart_init() 
 {
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
-	config.bufsz = 1024;
+	config.bufsz = 4096;
 	
 #ifdef RT_USING_UART0
 	// wait for fifo empty
@@ -792,6 +792,14 @@ char RTT_USER[16] = {"admin"};
 char RTT_PASS[36] = {"21232f297a57a5a743894a0e4a801fc3"};
 unsigned long long RTT_PRJNO = 0;
 
+static void rt_hw_write_char(char c)
+{
+    rt_device_t dev = rt_console_get_device();
+    if (dev == NULL)
+        ets_write_char_uart(c);
+    else
+        rt_device_write(dev, 0, &c, 1);
+}
 void rt_hw_board_init(void)
 {
 	/* initialize gpio */
@@ -811,6 +819,8 @@ void rt_hw_board_init(void)
 #ifdef RT_USING_CONSOLE
     rt_console_set_device(CONSOLE_DEVICE);
 #endif
+    ets_install_putc1(rt_hw_write_char);
+    ets_install_putc2(NULL);
 
 	rt_thread_idle_sethook(rt_hw_idle_hook);
 	rt_thread_inited_sethook(thread_inited);
