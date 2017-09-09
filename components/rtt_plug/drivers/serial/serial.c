@@ -38,6 +38,9 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 
+#undef getc
+#undef putc
+
 /*
  * Serial poll routines
  */
@@ -684,7 +687,7 @@ rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
 }
 
 /* ISR for serial interrupt */
-void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
+void IRAM_ATTR rt_hw_serial_isr(struct rt_serial_device *serial, int event)
 {
     switch (event & 0xff)
     {

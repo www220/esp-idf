@@ -174,7 +174,7 @@ static rt_err_t esp32_control(struct rt_serial_device *serial, int cmd, void *ar
     return RT_EOK;
 }
 
-static int esp32_putc(struct rt_serial_device *serial, char c)
+static int IRAM_ATTR esp32_putc(struct rt_serial_device *serial, char c)
 {
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
     int uart_num = uart->num;
@@ -188,7 +188,7 @@ static int esp32_putc(struct rt_serial_device *serial, char c)
     return 1;
 }
 
-static int esp32_getc(struct rt_serial_device *serial)
+static int IRAM_ATTR esp32_getc(struct rt_serial_device *serial)
 {
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
     int uart_num = uart->num;
@@ -235,7 +235,7 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
     }
 }
 
-static const struct rt_uart_ops esp32_uart_ops =
+static DRAM_ATTR const struct rt_uart_ops esp32_uart_ops =
 {
     esp32_configure,
     esp32_control,

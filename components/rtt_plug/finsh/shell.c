@@ -82,7 +82,7 @@ const char *finsh_get_prompt()
 }
 #endif
 
-static rt_err_t finsh_rx_ind(rt_device_t dev, rt_size_t size)
+static rt_err_t IRAM_ATTR finsh_rx_ind(rt_device_t dev, rt_size_t size)
 {
     RT_ASSERT(shell != RT_NULL);
 
