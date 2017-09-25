@@ -255,6 +255,15 @@ void start_cpu0_default(void)
 {
     esp_err_t err;
     esp_setup_syscall_table();
+
+#if CONFIG_SPIRAM_BOOT_INIT && (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC)
+    esp_err_t r=esp_spiram_add_to_heapalloc();
+    if (r != ESP_OK) {
+        ESP_EARLY_LOGE(TAG, "External RAM could not be added to heap!");
+        abort();
+    }
+#endif
+
 //Enable trace memory and immediately start trace.
 #if CONFIG_ESP32_TRAX
 #if CONFIG_ESP32_TRAX_TWOBANKS
@@ -297,17 +306,13 @@ void start_cpu0_default(void)
     esp_set_time_from_rtc();
 #if CONFIG_ESP32_APPTRACE_ENABLE
     err = esp_apptrace_init();
-    if (err != ESP_OK) {
-        ESP_EARLY_LOGE(TAG, "Failed to init apptrace module on CPU0 (%d)!", err);
-    }
+    assert(err == ESP_OK && "Failed to init apptrace module on PRO CPU!");
 #endif
 #if CONFIG_SYSVIEW_ENABLE
     SEGGER_SYSVIEW_Conf();
 #endif
     err = esp_pthread_init();
-    if (err != ESP_OK) {
-        ESP_EARLY_LOGE(TAG, "Failed to init pthread module (%d)!", err);
-    }
+    assert(err == ESP_OK && "Failed to init pthread module!");
 
     do_global_ctors();
 #if CONFIG_INT_WDT
@@ -342,19 +347,17 @@ void start_cpu0_default(void)
 #if !CONFIG_FREERTOS_UNICORE
 void start_cpu1_default(void)
 {
+    // Wait for FreeRTOS initialization to finish on PRO CPU
+    while (port_xSchedulerRunning[0] == 0) {
+        ;
+    }
 #if CONFIG_ESP32_TRAX_TWOBANKS
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
 #endif
 #if CONFIG_ESP32_APPTRACE_ENABLE
     esp_err_t err = esp_apptrace_init();
-    if (err != ESP_OK) {
-        ESP_EARLY_LOGE(TAG, "Failed to init apptrace module on CPU1 (%d)!", err);
-    }
+    assert(err == ESP_OK && "Failed to init apptrace module on APP CPU!");
 #endif
-    // Wait for FreeRTOS initialization to finish on PRO CPU
-    while (port_xSchedulerRunning[0] == 0) {
-        ;
-    }
     //Take care putting stuff here: if asked, FreeRTOS will happily tell you the scheduler
     //has started, but it isn't active *on this CPU* yet.
     esp_cache_err_int_init();

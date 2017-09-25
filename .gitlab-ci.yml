@@ -175,16 +175,21 @@ build_docs:
   tags:
     - build_docs
   artifacts:
+    when: always
     paths:
+      - docs/doxygen-warning-log.txt
+      - docs/sphinx-warning-log.txt
+      - docs/sphinx-warning-log-sanitized.txt
       - docs/_build/html
     expire_in: 1 mos
   script:
     - cd docs
     - doxygen
-    # If not building master branch, and there are Doxygen warnings, print them and bail out
-    - test -n $IS_PRIVATE && test $(cat doxygen-warning-log.txt | wc -l) -eq 0 || ( echo "Doxygen pass had some warnings:" && cat doxygen-warning-log.txt && false )
+    # If there are Doxygen warnings, print them and bail out
+    - test $(cat doxygen-warning-log.txt | wc -l) -eq 0 || ( echo "Doxygen pass had some warnings:" && cat doxygen-warning-log.txt && false )
     - make gh-linkcheck
     - make html
+    - ./check_doc_warnings.sh
 
 test_nvs_on_host:
   stage: test

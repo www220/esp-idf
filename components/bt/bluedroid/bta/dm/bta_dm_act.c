@@ -523,6 +523,29 @@ void bta_dm_set_dev_name (tBTA_DM_MSG *p_data)
     bta_dm_set_eir ((char *)p_data->set_name.name);
 }
 
+void bta_dm_update_white_list(tBTA_DM_MSG *p_data)
+{
+    BTM_BleUpdateAdvWhitelist(p_data->white_list.add_remove, p_data->white_list.remote_addr);
+}
+
+void bta_dm_ble_read_adv_tx_power(tBTA_DM_MSG *p_data)
+{
+    if (p_data->read_tx_power.read_tx_power_cb != NULL) {
+        BTM_BleReadAdvTxPower(p_data->read_tx_power.read_tx_power_cb);
+    } else {
+        APPL_TRACE_ERROR("%s(), the callback function cann't be NULL.", __func__);
+    }
+}
+
+void bta_dm_ble_read_rssi(tBTA_DM_MSG *p_data)
+{
+    if (p_data->rssi.read_rssi_cb != NULL) {
+        BTM_ReadRSSI(p_data->rssi.remote_addr, p_data->rssi.read_rssi_cb);
+    } else {
+        APPL_TRACE_ERROR("%s(), the callback function cann't be NULL.", __func__);
+    }
+}
+
 /*******************************************************************************
 **
 ** Function         bta_dm_set_visibility
@@ -5608,7 +5631,7 @@ static void bta_dm_gattc_callback(tBTA_GATTC_EVT event, tBTA_GATTC *p_data)
         break;
 
     case BTA_GATTC_SEARCH_RES_EVT:
-        bta_dm_gatt_disc_result(p_data->srvc_res.service_uuid.id);
+        bta_dm_gatt_disc_result(p_data->srvc_res.service_uuid);
         break;
 
     case BTA_GATTC_SEARCH_CMPL_EVT:
