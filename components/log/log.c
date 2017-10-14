@@ -310,10 +310,13 @@ static inline void heap_swap(int i, int j)
 #define ATTR
 #endif // BOOTLOADER_BUILD
 
+//the variable defined in ROM is the cpu frequency in MHz.
+//as a workaround before the interface for this variable
+extern uint32_t g_ticks_per_us_pro;
 
 uint32_t ATTR esp_log_early_timestamp()
 {
-    return xthal_get_ccount() / (CPU_CLK_FREQ_ROM / 1000);
+    return xthal_get_ccount() / (g_ticks_per_us_pro * 1000);
 }
 
 #ifndef BOOTLOADER_BUILD
@@ -324,7 +327,7 @@ uint32_t IRAM_ATTR esp_log_timestamp()
         return esp_log_early_timestamp();
     }
     static uint32_t base = 0;
-    if (base == 0) {
+    if (base == 0 && xPortGetCoreID() == 0) {
         base = esp_log_early_timestamp();
     }
     return base + xTaskGetTickCount() * (1000 / configTICK_RATE_HZ);
@@ -351,7 +354,7 @@ void esp_log_buffer_hex_internal(const char *tag, const void *buffer, uint16_t b
         } else {
             bytes_cur_line = buff_len;
         }
-        if ( !esp_ptr_byte_accesible(buffer) ) {
+        if ( !esp_ptr_byte_accessible(buffer) ) {
             //use memcpy to get around alignment issue
             memcpy( temp_buffer, buffer, (bytes_cur_line+3)/4*4 );
             ptr_line = temp_buffer;
@@ -383,7 +386,7 @@ void esp_log_buffer_char_internal(const char *tag, const void *buffer, uint16_t 
         } else {
             bytes_cur_line = buff_len;
         }
-        if ( !esp_ptr_byte_accesible(buffer) ) {
+        if ( !esp_ptr_byte_accessible(buffer) ) {
             //use memcpy to get around alignment issue
             memcpy( temp_buffer, buffer, (bytes_cur_line+3)/4*4 );
             ptr_line = temp_buffer;
@@ -418,7 +421,7 @@ void esp_log_buffer_hexdump_internal( const char *tag, const void *buffer, uint1
         } else {
             bytes_cur_line = buff_len;
         }
-        if ( !esp_ptr_byte_accesible(buffer) ) {
+        if ( !esp_ptr_byte_accessible(buffer) ) {
             //use memcpy to get around alignment issue
             memcpy( temp_buffer, buffer, (bytes_cur_line+3)/4*4 );
             ptr_line = temp_buffer;
