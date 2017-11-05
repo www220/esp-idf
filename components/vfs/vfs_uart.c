@@ -277,7 +277,6 @@ static ssize_t uart_read_rtt(int fd, void* data, size_t size)
 void esp_vfs_dev_uart_register()
 {
     esp_vfs_t vfs = {
-        .fd_offset = 0,
         .flags = ESP_VFS_FLAG_DEFAULT,
         .write = &uart_write_rtt,
         .open = &uart_open,
