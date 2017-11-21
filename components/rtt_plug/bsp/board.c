@@ -16,7 +16,7 @@
 #include "esp_err.h"
 #include "esp_eth.h"
 #include "tcpip_adapter.h"
-#include "lan_phy.h"
+#include "eth_phy/phy_lan8720.h"
 
 #include <thread_esp32.h>
 
@@ -412,118 +412,22 @@ void rt_hw_idle_hook(void)
 	esp_vApplicationIdleHook();
 }
 
-static void eth_phy_check_phy_init(void)
-{
-    while((esp_eth_smi_read(BASIC_MODE_STATUS_REG) & AUTO_NEGOTIATION_COMPLETE ) != AUTO_NEGOTIATION_COMPLETE)
-    {};
-	while((esp_eth_smi_read(PHY_STATUS_REG) & AUTO_NEGTIATION_STATUS ) != AUTO_NEGTIATION_STATUS)
-    {};
-}
-
-static eth_speed_mode_t eth_phy_get_speed_mode(void)
-{
-    if((esp_eth_smi_read(PHY_STATUS_REG) & SPEED_STATUS ) != SPEED_STATUS) {
-        return ETH_SPEED_MODE_100M;
-    } else {
-        return ETH_SPEED_MODE_10M;
-    }   
-}
-
-static eth_duplex_mode_t eth_phy_get_duplex_mode(void)
-{
-    if((esp_eth_smi_read(PHY_STATUS_REG) & DUPLEX_STATUS ) == DUPLEX_STATUS) {
-        return ETH_MODE_HALFDUPLEX;
-    } else {
-        return ETH_MODE_HALFDUPLEX;
-    }
-}
-
-static bool eth_phy_check_phy_link_status(void)
-{
-    if((esp_eth_smi_read(BASIC_MODE_STATUS_REG) & LINK_STATUS) == LINK_STATUS ) {
-		return true;
-    } else {
-		return false;
-	}
-}
-
-static bool eth_phy_get_partner_pause_enable(void)
-{
-    if((esp_eth_smi_read(PHY_LINK_PARTNER_ABILITY_REG) & PARTNER_PAUSE) == PARTNER_PAUSE) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-static void eth_phy_enable_flow_ctrl(void)
-{
-    uint32_t data = 0;
-    data = esp_eth_smi_read(AUTO_NEG_ADVERTISEMENT_REG);
-    esp_eth_smi_write(AUTO_NEG_ADVERTISEMENT_REG,data|ASM_DIR|PAUSE);
-}
-
-static void eth_phy_power_enable(bool enable)
-{
-}
-
+#define ETH_PHY_ADDR  0
+#define PIN_SMI_MDC   33
+#define PIN_SMI_MDIO  32
 static void eth_phy_init(void)
 {
 	gpio_set_level(GPIO_NUM_14, 0);
 	rt_thread_delay(M2T(100));
 	gpio_set_level(GPIO_NUM_14, 1);	
-
-    esp_eth_smi_write(PHY_RESET_CONTROL_REG, SOFTWARE_RESET);
-	rt_thread_delay(M2T(500));
-
-    esp_eth_smi_write(PHY_RESET_CONTROL_REG, SOFTWARE_AUTO_NEGTIATION);
 	rt_thread_delay(M2T(100));
-
-    //if config.flow_ctrl_enable == true ,enable this 
-    eth_phy_enable_flow_ctrl();
+	phy_lan8720_init();
 }
 
 static void eth_gpio_config_rmii(void)
 {
-    //txd0 to gpio19 ,can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO19_U, FUNC_GPIO19_EMAC_TXD0);
-    gpio_set_direction(19, GPIO_MODE_OUTPUT);
-    //tx_en to gpio21 ,can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO21_U, FUNC_GPIO21_EMAC_TX_EN);
-    gpio_set_direction(21, GPIO_MODE_OUTPUT);
-    //txd1 to gpio22 , can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO22_U, FUNC_GPIO22_EMAC_TXD1);
-    gpio_set_direction(22, GPIO_MODE_OUTPUT);
-    //rx_dv to gpio27 , can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO27_U, FUNC_GPIO27_EMAC_RX_DV);
-    gpio_set_direction(27, GPIO_MODE_INPUT);
-    //rxd0 to gpio25 , can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO25_U, FUNC_GPIO25_EMAC_RXD0);
-    gpio_set_direction(25, GPIO_MODE_INPUT);
-    //rxd1 to gpio26 ,can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO26_U, FUNC_GPIO26_EMAC_RXD1);
-    gpio_set_direction(26, GPIO_MODE_INPUT);
-#if 0
-    //rmii clk  ,can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO0_U, FUNC_GPIO0_EMAC_TX_CLK);
-    gpio_set_direction(0, GPIO_MODE_INPUT);
-#else
-    //rmii clk  ,can not change
-    PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO16_U, FUNC_GPIO16_EMAC_CLK_OUT);
-    gpio_set_direction(16, GPIO_MODE_OUTPUT);
-#endif
-
-	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_33)) rtc_gpio_deinit(GPIO_NUM_33);
-	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_32)) rtc_gpio_deinit(GPIO_NUM_32);
-	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_33], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_33, GPIO_PULLUP_ONLY);
-	gpio_set_direction(GPIO_NUM_33, GPIO_MODE_OUTPUT);
-	gpio_matrix_out(GPIO_NUM_33, EMAC_MDC_O_IDX, 0, 0);
-	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_32], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_32, GPIO_PULLUP_ONLY);
-	gpio_set_direction(GPIO_NUM_32, GPIO_MODE_INPUT_OUTPUT);
-	gpio_matrix_in(GPIO_NUM_32, EMAC_MDI_I_IDX, 0);
-	gpio_matrix_out(GPIO_NUM_32, EMAC_MDO_O_IDX, 0, 0);
+	phy_rmii_configure_data_interface_pins();
+	phy_rmii_smi_configure_pins(PIN_SMI_MDC, PIN_SMI_MDIO);
 
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_14)) rtc_gpio_deinit(GPIO_NUM_14);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_14], PIN_FUNC_GPIO);
@@ -535,28 +439,20 @@ static void eth_gpio_config_rmii(void)
 
 int rt_hw_eth_init(void)
 {
-    eth_config_t config;
-    config.phy_addr = PHY0;
-    config.mac_mode = ETH_MODE_RMII;
-    config.phy_init = eth_phy_init;
+    eth_config_t config = phy_lan8720_default_ethernet_config;
+    config.phy_addr = ETH_PHY_ADDR;
+    config.phy_init = eth_phy_init,
     config.gpio_config = eth_gpio_config_rmii;
     config.tcpip_input = tcpip_adapter_eth_input;
-    config.phy_check_init = eth_phy_check_phy_init;
-    config.phy_check_link = eth_phy_check_phy_link_status;
-    config.phy_get_speed_mode = eth_phy_get_speed_mode;
-    config.phy_get_duplex_mode = eth_phy_get_duplex_mode;
-    //Only FULLDUPLEX mode support flow ctrl now!
-    config.flow_ctrl_enable = true;
-    config.phy_get_partner_pause_enable = eth_phy_get_partner_pause_enable;    
-    config.phy_power_enable = eth_phy_power_enable;
+    config.clock_mode = ETH_CLOCK_GPIO16_OUT;
 
-	int ret = ESP_FAIL;
+    int ret = ESP_FAIL;
     if(esp_eth_init(&config) == ESP_OK)
     {
         esp_eth_enable();
-		ret = ESP_OK;
+        ret = ESP_OK;
     }
-	return ret;
+    return ret;
 }
 
 struct rb

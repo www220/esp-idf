@@ -101,18 +101,6 @@ void emac_enable_clk(bool enable)
     }
 }
 
-void emac_set_clk_mii(void)
-{
-    //select ex clock source
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_EXT_OSC_EN);
-    //ex clk enable
-    REG_SET_BIT(EMAC_EX_OSCCLK_CONF_REG, EMAC_EX_OSC_CLK_SEL);
-
-    //set mii mode rx/tx clk enable
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_MII_CLK_RX_EN);
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_MII_CLK_TX_EN);
-}
-
 void emac_dma_init(void)
 {
     REG_SET_BIT(EMAC_DMAOPERATION_MODE_REG, EMAC_FORWARD_UNDERSIZED_GOOD_FRAMES);
@@ -133,22 +121,4 @@ void emac_mac_init(void)
     REG_SET_BIT(EMAC_GMACCONFIG_REG, EMAC_GMACMIIGMII);
     REG_CLR_BIT(EMAC_GMACCONFIG_REG, EMAC_GMACFESPEED);
     REG_SET_BIT(EMAC_GMACFRAMEFILTER_REG, EMAC_PROMISCUOUS_MODE);
-}
-
-#include "soc/rtc.h"
-void emac_set_clk_rmii(void)
-{
-#if 0
-    //select ex clock source
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_EXT_OSC_EN);
-    //ex clk enable
-    REG_SET_BIT(EMAC_EX_OSCCLK_CONF_REG, EMAC_EX_OSC_CLK_SEL);
-#else
-    //select ex clock source
-    REG_SET_BIT(EMAC_EX_CLK_CTRL_REG, EMAC_EX_INT_OSC_EN);
-    //ex clk enable
-    REG_SET_FIELD(EMAC_EX_CLKOUT_CONF_REG, EMAC_EX_CLK_OUT_H_DIV_NUM, 0);
-    REG_SET_FIELD(EMAC_EX_CLKOUT_CONF_REG, EMAC_EX_CLK_OUT_DIV_NUM, 0);
-    rtc_clk_apll_enable(true, 0, 0, 6, 2); // 50 MHz
-#endif
 }

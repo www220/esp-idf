@@ -175,6 +175,14 @@ TaskHandle_t xTaskGetCurrentTaskHandleForCPU( BaseType_t cpuid )
     return NULL;
 }
 
+TaskHandle_t xTaskGetIdleTaskHandleForCPU( UBaseType_t cpuid )
+{
+    if (cpuid == RTT_USING_CPUID)
+        return rt_thread_idle_gethandler();
+    ets_printf("xTaskGetIdleTaskHandleForCPU cpuid == %d\n",cpuid);
+    return NULL;
+}
+
 BaseType_t xTaskGetSchedulerState( void )
 {
     BaseType_t xReturn = taskSCHEDULER_NOT_STARTED;

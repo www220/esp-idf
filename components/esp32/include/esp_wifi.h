@@ -523,11 +523,12 @@ esp_err_t esp_wifi_get_channel(uint8_t *primary, wifi_second_chan_t *second);
   * @brief     configure country info
   *
   * @attention 1. The default country is {.cc="CN", .schan=1, .nchan=13, policy=WIFI_COUNTRY_POLICY_AUTO}
-  * @attention 2. When the country policy is WIFI_COUNTRY_POLICY_AUTO, use the country info of AP to which 
-  *               the station is connected. E.g. if the configured country info is {.cc="USA", .schan=1, .nchan=11}, 
-  *               the country info of the AP to which the station is connected is {.cc="JP", .schan=1, .nchan=14},
-  *               then our country info is {.cc="JP", .schan=1, .nchan=14}. If the station disconnected
-  *               from the AP, the country info back to {.cc="USA", .schan=1, .nchan=11} again.
+  * @attention 2. When the country policy is WIFI_COUNTRY_POLICY_AUTO, the country info of the AP to which
+  *               the station is connected is used. E.g. if the configured country info is {.cc="USA", .schan=1, .nchan=11}
+  *               and the country info of the AP to which the station is connected is {.cc="JP", .schan=1, .nchan=14}
+  *               then the country info that will be used is {.cc="JP", .schan=1, .nchan=14}. If the station disconnected
+  *               from the AP the country info is set back back to the country info of the station automatically,
+  *               {.cc="USA", .schan=1, .nchan=11} in the example.
   * @attention 3. When the country policy is WIFI_COUNTRY_POLICY_MANUAL, always use the configured country info.
   * @attention 4. When the country info is changed because of configuration or because the station connects to a different
   *               external AP, the country IE in probe response/beacon of the soft-AP is changed also.
@@ -640,11 +641,11 @@ esp_err_t esp_wifi_set_promiscuous(bool en);
 esp_err_t esp_wifi_get_promiscuous(bool *en);
 
 /**
-  * @brief     Enable the promiscuous filter.
+  * @brief Enable the promiscuous mode packet type filter.
   *
-  * @attention 1. The default filter is to filter all packets except WIFI_PKT_MISC
+  * @note The default filter is to filter all packets except WIFI_PKT_MISC
   *
-  * @param     filter the packet type filtered by promisucous
+  * @param filter the packet type filtered in promiscuous mode.
   *
   * @return
   *    - ESP_OK: succeed
@@ -672,7 +673,7 @@ esp_err_t esp_wifi_get_promiscuous_filter(wifi_promiscuous_filter_t *filter);
   * @attention 3. ESP32 is limited to only one channel, so when in the soft-AP+station mode, the soft-AP will adjust its channel automatically to be the same as
   *               the channel of the ESP32 station.
   *
-  * @param     ifx  interface
+  * @param     interface  interface
   * @param     conf  station or soft-AP configuration
   *
   * @return
@@ -685,12 +686,12 @@ esp_err_t esp_wifi_get_promiscuous_filter(wifi_promiscuous_filter_t *filter);
   *    - ESP_ERR_WIFI_NVS: WiFi internal NVS error
   *    - others: refer to the erro code in esp_err.h
   */
-esp_err_t esp_wifi_set_config(wifi_interface_t ifx, const wifi_config_t *conf);
+esp_err_t esp_wifi_set_config(wifi_interface_t interface, wifi_config_t *conf);
 
 /**
   * @brief     Get configuration of specified interface
   *
-  * @param     ifx  interface
+  * @param     interface  interface
   * @param[out]  conf  station or soft-AP configuration
   *
   * @return
@@ -699,7 +700,7 @@ esp_err_t esp_wifi_set_config(wifi_interface_t ifx, const wifi_config_t *conf);
   *    - ESP_ERR_WIFI_ARG: invalid argument
   *    - ESP_ERR_WIFI_IF: invalid interface
   */
-esp_err_t esp_wifi_get_config(wifi_interface_t ifx, wifi_config_t *conf);
+esp_err_t esp_wifi_get_config(wifi_interface_t interface, wifi_config_t *conf);
 
 /**
   * @brief     Get STAs associated with soft-AP
