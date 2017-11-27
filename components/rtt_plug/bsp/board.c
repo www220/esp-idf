@@ -15,6 +15,7 @@
 #include "esp_system.h"
 #include "esp_err.h"
 #include "esp_eth.h"
+#include "esp_clk.h"
 #include "tcpip_adapter.h"
 #include "eth_phy/phy_lan8720.h"
 
@@ -102,7 +103,14 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
     int uart_num = uart->num;
     
-    uint32_t clk_div = (((UART_CLK_FREQ) << 4) / cfg->baud_rate);
+    int uart_clk_freq;
+    if (UART[uart_num]->conf0.tick_ref_always_on == 0) {
+        /* this UART has been configured to use REF_TICK */
+        uart_clk_freq = REF_CLK_FREQ;
+    } else {
+        uart_clk_freq = esp_clk_apb_freq();
+    }
+    uint32_t clk_div = (((uart_clk_freq) << 4) / cfg->baud_rate);
     UART[uart_num]->clk_div.div_int = clk_div >> 4;
     UART[uart_num]->clk_div.div_frag = clk_div & 0xf;
     //
@@ -128,14 +136,20 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     UART[uart_num]->conf0.parity = parity & 0x1;
     UART[uart_num]->conf0.parity_en = (parity >> 1) & 0x1;
     //
-    uint32_t stopbit = UART_STOP_BITS_1;
+    uint32_t stop_bit = UART_STOP_BITS_1;
     switch (cfg->stop_bits)
     {
     case STOP_BITS_2:
-        stopbit = UART_STOP_BITS_2;
+        stop_bit = UART_STOP_BITS_2;
         break;
     }
-    UART[uart_num]->conf0.stop_bit_num = stopbit;
+    if (stop_bit == UART_STOP_BITS_2) {
+        stop_bit = UART_STOP_BITS_1;
+        UART[uart_num]->rs485_conf.dl1_en = 1;
+    } else {
+        UART[uart_num]->rs485_conf.dl1_en = 0;
+    }
+    UART[uart_num]->conf0.stop_bit_num = stop_bit;
 	//
     CLEAR_PERI_REG_MASK(UART_CONF0_REG(uart_num), UART_LINE_INV_MASK);
     SET_PERI_REG_MASK(UART_CONF0_REG(uart_num), UART_INVERSE_DISABLE);
@@ -150,7 +164,6 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     else
         UART[uart_num]->conf0.tx_flow_en = 0;
 	//
-	UART[uart_num]->conf0.tick_ref_always_on = 1;
 	ESP_INTR_DISABLE(uart->irq);
     return RT_EOK;
 }
@@ -427,7 +440,18 @@ static void eth_phy_init(void)
 static void eth_gpio_config_rmii(void)
 {
 	phy_rmii_configure_data_interface_pins();
-	phy_rmii_smi_configure_pins(PIN_SMI_MDC, PIN_SMI_MDIO);
+
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_33)) rtc_gpio_deinit(GPIO_NUM_33);
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_32)) rtc_gpio_deinit(GPIO_NUM_32);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_33], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_33, GPIO_PULLUP_ONLY);
+	gpio_set_direction(GPIO_NUM_33, GPIO_MODE_OUTPUT);
+	gpio_matrix_out(GPIO_NUM_33, EMAC_MDC_O_IDX, 0, 0);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_32], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_32, GPIO_PULLUP_ONLY);
+	gpio_set_direction(GPIO_NUM_32, GPIO_MODE_INPUT_OUTPUT);
+	gpio_matrix_in(GPIO_NUM_32, EMAC_MDI_I_IDX, 0);
+	gpio_matrix_out(GPIO_NUM_32, EMAC_MDO_O_IDX, 0, 0);
 
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_14)) rtc_gpio_deinit(GPIO_NUM_14);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_14], PIN_FUNC_GPIO);
@@ -445,6 +469,7 @@ int rt_hw_eth_init(void)
     config.gpio_config = eth_gpio_config_rmii;
     config.tcpip_input = tcpip_adapter_eth_input;
     config.clock_mode = ETH_CLOCK_GPIO16_OUT;
+    config.flow_ctrl_enable = false;
 
     int ret = ESP_FAIL;
     if(esp_eth_init(&config) == ESP_OK)

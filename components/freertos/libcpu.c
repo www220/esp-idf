@@ -241,7 +241,8 @@ BaseType_t xTaskIncrementTick( void )
 void *pvTaskGetThreadLocalStoragePointer( TaskHandle_t xTaskToQuery, BaseType_t xIndex )
 {
 	rt_thread_t thread = xTaskToQuery;
-
+    if (thread == NULL)
+        thread = rt_current_thread;
 	if( xIndex < configNUM_THREAD_LOCAL_STORAGE_POINTERS )
 		return thread->xtls[xIndex];
 	return NULL;
@@ -250,6 +251,8 @@ void *pvTaskGetThreadLocalStoragePointer( TaskHandle_t xTaskToQuery, BaseType_t 
 void vTaskSetThreadLocalStoragePointerAndDelCallback( TaskHandle_t xTaskToSet, BaseType_t xIndex, void *pvValue , TlsDeleteCallbackFunction_t xDelCallback)
 {
 	rt_thread_t thread = xTaskToSet;
+    if (thread == NULL)
+        thread = rt_current_thread;
 	if( xIndex < configNUM_THREAD_LOCAL_STORAGE_POINTERS )
 	{
 		thread->xtls[xIndex] = pvValue;
