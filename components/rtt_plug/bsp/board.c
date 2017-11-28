@@ -23,6 +23,7 @@
 
 #define UART_FULL_THRESH_DEFAULT  (120)
 #define UART_TOUT_THRESH_DEFAULT   (10)
+#define UART_TX_IDLE_NUM_DEFAULT   (0)
 
 #define UART_FIFO_LEN           (128)        /*!< Length of the hardware FIFO buffers */
 #define UART_INTR_MASK          0x1ff        /*!< mask of all UART interrupts */
@@ -164,6 +165,7 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     else
         UART[uart_num]->conf0.tx_flow_en = 0;
 	//
+    UART[uart_num]->idle_conf.tx_idle_num = UART_TX_IDLE_NUM_DEFAULT;
 	ESP_INTR_DISABLE(uart->irq);
     return RT_EOK;
 }
@@ -218,6 +220,7 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
 {
     struct rt_serial_device *serial = (struct rt_serial_device *)param;
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
+    int rx_fifo_len = 0;
     uint8_t uart_num = uart->num;
     uint32_t uart_intr_status = UART[uart_num]->int_st.val;
 
@@ -231,8 +234,11 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
             UART[uart_num]->int_clr.rxfifo_tout = 1;
             UART[uart_num]->int_clr.rxfifo_full = 1;
         } else if(uart_intr_status & UART_RXFIFO_OVF_INT_ST_M) {
-            UART[uart_num]->conf0.rxfifo_rst = 1;
-            UART[uart_num]->conf0.rxfifo_rst = 0;
+            // Read all data from the FIFO
+            rx_fifo_len = UART[uart_num]->status.rxfifo_cnt;
+            for (int i = 0; i < rx_fifo_len; i++) {
+                READ_PERI_REG(UART_FIFO_REG(uart_num));
+            }
             UART[uart_num]->int_clr.rxfifo_ovf = 1;
         } else if(uart_intr_status & UART_BRK_DET_INT_ST_M) {
             UART[uart_num]->int_clr.brk_det = 1;
@@ -274,6 +280,7 @@ static struct esp32_uart uart2 = { UART_NUM_2, UART_INTR_NUM_2 };
 
 void rt_hw_usart_init() 
 {
+    int rx_fifo_len;
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
 	config.bufsz = 4096;
 	
@@ -321,11 +328,11 @@ void rt_hw_usart_init()
 #endif
 #ifdef RT_USING_UART2
 	periph_module_enable(PERIPH_UART1_MODULE);
-    UART[uart1.num]->conf0.rxfifo_rst = 1;
-    UART[uart1.num]->conf0.rxfifo_rst = 0;
-    UART[uart1.num]->conf0.txfifo_rst = 1;
-    UART[uart1.num]->conf0.txfifo_rst = 0;
-	
+    rx_fifo_len = UART[uart1.num]->status.rxfifo_cnt;
+    for (int i = 0; i < rx_fifo_len; i++) {
+        READ_PERI_REG(UART_FIFO_REG(uart1.num));
+    }
+
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_12)) rtc_gpio_deinit(GPIO_NUM_12);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_34)) rtc_gpio_deinit(GPIO_NUM_34);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_5)) rtc_gpio_deinit(GPIO_NUM_5);
@@ -365,10 +372,10 @@ void rt_hw_usart_init()
 #endif
 #ifdef RT_USING_UART1
 	periph_module_enable(PERIPH_UART2_MODULE);
-    UART[uart2.num]->conf0.rxfifo_rst = 1;
-    UART[uart2.num]->conf0.rxfifo_rst = 0;
-    UART[uart2.num]->conf0.txfifo_rst = 1;
-    UART[uart2.num]->conf0.txfifo_rst = 0;
+    rx_fifo_len = UART[uart2.num]->status.rxfifo_cnt;
+    for (int i = 0; i < rx_fifo_len; i++) {
+        READ_PERI_REG(UART_FIFO_REG(uart2.num));
+    }
 
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_2)) rtc_gpio_deinit(GPIO_NUM_2);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_18)) rtc_gpio_deinit(GPIO_NUM_18);

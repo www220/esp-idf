@@ -264,6 +264,19 @@ COMMON_FLAGS = \
 	-mlongcalls \
 	-nostdlib
 
+ifndef IS_BOOTLOADER_BUILD
+# stack protection (only one option can be selected in menuconfig)
+ifdef CONFIG_STACK_CHECK_NORM
+COMMON_FLAGS += -fstack-protector
+endif
+ifdef CONFIG_STACK_CHECK_STRONG
+COMMON_FLAGS += -fstack-protector-strong
+endif
+ifdef CONFIG_STACK_CHECK_ALL
+COMMON_FLAGS += -fstack-protector-all
+endif
+endif
+
 # Optimization flags are set based on menuconfig choice
 ifdef CONFIG_OPTIMIZATION_LEVEL_RELEASE
 OPTIMIZATION_FLAGS = -Os
@@ -512,7 +525,7 @@ TOOLCHAIN_COMMIT_DESC := $(shell $(CC) --version | sed -E -n 's|.*crosstool-ng-(
 TOOLCHAIN_GCC_VER := $(shell $(CC) --version | sed -E -n 's|xtensa-esp32-elf-gcc.*\ \(.*\)\ (.*)|\1|gp')
 
 # Officially supported version(s)
-SUPPORTED_TOOLCHAIN_COMMIT_DESC := 1.22.0-73-ge28a011
+SUPPORTED_TOOLCHAIN_COMMIT_DESC := 1.22.0-75-gbaf03c2
 SUPPORTED_TOOLCHAIN_GCC_VERSIONS := 5.2.0
 
 ifdef TOOLCHAIN_COMMIT_DESC

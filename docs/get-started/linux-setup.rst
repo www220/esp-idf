@@ -28,17 +28,17 @@ ESP32 toolchain for Linux is available for download from Espressif website:
 
 - for 64-bit Linux:
 
-  https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-73-ge28a011-5.2.0.tar.gz
+  https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-75-gbaf03c2-5.2.0.tar.gz
 
 - for 32-bit Linux:
 
-  https://dl.espressif.com/dl/xtensa-esp32-elf-linux32-1.22.0-73-ge28a011-5.2.0.tar.gz
+  https://dl.espressif.com/dl/xtensa-esp32-elf-linux32-1.22.0-75-gbaf03c2-5.2.0.tar.gz
 
 1.  Download this file, then extract it in ``~/esp`` directory::
 
         mkdir -p ~/esp
         cd ~/esp
-        tar -xzf ~/Downloads/xtensa-esp32-elf-linux64-1.22.0-73-ge28a011-5.2.0.tar.gz
+        tar -xzf ~/Downloads/xtensa-esp32-elf-linux64-1.22.0-75-gbaf03c2-5.2.0.tar.gz
 
 .. _setup-linux-toolchain-add-it-to-path:
 
@@ -68,6 +68,12 @@ ESP32 toolchain for Linux is available for download from Espressif website:
         /home/user-name/bin:/home/user-name/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/user-name/esp/xtensa-esp32-elf/bin
 
     Instead of ``/home/user-name`` there should be a home path specific to your installation.
+
+
+Permission issues /dev/ttyUSB0
+------------------------------
+
+With some Linux distributions you may get the ``Failed to open port /dev/ttyUSB0`` error message when flashing the ESP32. :ref:`This can be solved by adding the current user to the dialout group<linux-dialout-group>`.
 
 
 Arch Linux Users
