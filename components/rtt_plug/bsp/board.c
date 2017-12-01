@@ -228,9 +228,7 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
     {
         if((uart_intr_status & UART_RXFIFO_TOUT_INT_ST_M) 
             || (uart_intr_status & UART_RXFIFO_FULL_INT_ST_M)) {
-            rt_interrupt_enter();
             rt_hw_serial_isr(serial, RT_SERIAL_EVENT_RX_IND);
-            rt_interrupt_leave();
             UART[uart_num]->int_clr.rxfifo_tout = 1;
             UART[uart_num]->int_clr.rxfifo_full = 1;
         } else if(uart_intr_status & UART_RXFIFO_OVF_INT_ST_M) {
@@ -418,18 +416,6 @@ void rt_hw_usart_init()
     rt_hw_serial_register(&serial2, "uart1", 
         RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
 #endif
-}
-
-void rt_hw_idle_hook(void)
-{
-	extern void esp_vApplicationIdleHook( void );
-
-#if ( configUSE_IDLE_HOOK == 1 )
-	extern void vApplicationIdleHook( void );
-	vApplicationIdleHook();
-#endif /* configUSE_IDLE_HOOK */
-
-	esp_vApplicationIdleHook();
 }
 
 #define ETH_PHY_ADDR  0
@@ -750,10 +736,7 @@ void rt_hw_board_init(void)
     ets_install_putc1(rt_hw_write_char);
     ets_install_putc2(NULL);
 
-	rt_thread_idle_sethook(rt_hw_idle_hook);
-	rt_thread_inited_sethook(thread_inited);
-
-	/* set cst */	
+	/* set cst */
     putenv("TZ=CST-8:00");
     tzset();
 }

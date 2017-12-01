@@ -121,6 +121,7 @@ static long _list_thread(struct rt_list_node *list)
     rt_kprintf(     " ---  ------- ---------- ----------  ------  ---------- ---\n");
     for (node = list->next; node != list; node = node->next)
     {
+#if 0
         thread = rt_list_entry(node, struct rt_thread, list);
         rt_kprintf("%-*.*s %3d ", maxlen, RT_NAME_MAX, thread->name, thread->current_priority);
 
@@ -139,6 +140,7 @@ static long _list_thread(struct rt_list_node *list)
                         / thread->stack_size,
                    thread->remaining_tick,
                    thread->error);
+#endif
     }
 
     return 0;
@@ -151,6 +153,7 @@ long list_thread(void)
 FINSH_FUNCTION_EXPORT(list_thread, list thread);
 MSH_CMD_EXPORT(list_thread, list thread);
 
+#if 0
 static void show_wait_queue(struct rt_list_node *list)
 {
     struct rt_thread *thread;
@@ -165,6 +168,7 @@ static void show_wait_queue(struct rt_list_node *list)
             rt_kprintf("/");
     }
 }
+#endif
 
 #ifdef RT_USING_SEMAPHORE
 static long _list_sem(struct rt_list_node *list)

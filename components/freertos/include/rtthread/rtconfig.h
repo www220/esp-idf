@@ -29,35 +29,10 @@
 /* Thread Debug */
 #define RT_DEBUG
 
-/* Using Hook */
-#define RT_USING_HOOK
-
-#define IDLE_THREAD_STACK_SIZE 2048
-//#define RT_USING_OVERFLOW_CHECK
-
-/* Using Software Timer */
-#define RT_USING_TIMER_SOFT
-#define RT_TIMER_THREAD_PRIO		12
-#define RT_TIMER_THREAD_STACK_SIZE	2048
-
-/* SECTION: IPC */
-/* Using Semaphore*/
-#define RT_USING_SEMAPHORE
-
-/* Using Mutex */
-#define RT_USING_MUTEX
-
-/* Using Event */
-#define RT_USING_EVENT
-
-/* Using MailBox */
-#define RT_USING_MAILBOX
-
-/* Using Message Queue */
-#define RT_USING_MESSAGEQUEUE
-
 /* Using Dynamic Heap Management */
 #define RT_USING_HEAP
+#define xRT_USING_SEMAPHORE
+#define xRT_USING_MUTEX
 
 /* SECTION: Device System */
 /* Using Device System */

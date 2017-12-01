@@ -275,7 +275,7 @@ void rt_memheap_free(void *ptr);
 
 /**@{*/
 
-#ifdef RT_USING_SEMAPHORE
+#ifdef xRT_USING_SEMAPHORE
 /*
  * semaphore interface
  */
@@ -293,7 +293,7 @@ rt_err_t rt_sem_release(rt_sem_t sem);
 rt_err_t rt_sem_control(rt_sem_t sem, rt_uint8_t cmd, void *arg);
 #endif
 
-#ifdef RT_USING_MUTEX
+#ifdef xRT_USING_MUTEX
 /*
  * mutex interface
  */

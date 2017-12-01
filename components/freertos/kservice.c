@@ -45,84 +45,9 @@
 
 /**@{*/
 
-/* global errno in RT-Thread */
-static volatile int _errno;
-
 #if defined(RT_USING_DEVICE) && defined(RT_USING_CONSOLE)
 static rt_device_t _console_device = RT_NULL;
 #endif
-
-/*
- * This function will get errno
- *
- * @return errno
- */
-rt_err_t rt_get_errno(void)
-{
-    rt_thread_t tid;
-
-    if (rt_interrupt_get_nest() != 0)
-    {
-        /* it's in interrupt context */
-        return _errno;
-    }
-
-    tid = rt_thread_self();
-    if (tid == RT_NULL)
-        return _errno;
-
-    return tid->error;
-}
-RTM_EXPORT(rt_get_errno);
-
-/*
- * This function will set errno
- *
- * @param error the errno shall be set
- */
-void rt_set_errno(rt_err_t error)
-{
-    rt_thread_t tid;
-
-    if (rt_interrupt_get_nest() != 0)
-    {
-        /* it's in interrupt context */
-        _errno = error;
-
-        return;
-    }
-
-    tid = rt_thread_self();
-    if (tid == RT_NULL)
-    {
-        _errno = error;
-
-        return;
-    }
-
-    tid->error = error;
-}
-RTM_EXPORT(rt_set_errno);
-
-/**
- * This function returns errno.
- *
- * @return the errno in the system
- */
-int *_rt_errno(void)
-{
-    rt_thread_t tid;
-
-    if (rt_interrupt_get_nest() != 0)
-        return (int *)&_errno;
-
-    tid = rt_thread_self();
-    if (tid != RT_NULL)
-        return (int *)&(tid->error);
-
-    return (int *)&_errno;
-}
-RTM_EXPORT(_rt_errno);
 
 /**
  * This function will set the content of memory to specified value

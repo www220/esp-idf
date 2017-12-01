@@ -477,65 +477,8 @@ typedef struct rt_timer *rt_timer_t;
 /**
  * Thread structure
  */
-struct rt_thread
-{
-    /* rt object */
-    char        name[RT_NAME_MAX];                      /**< the name of thread */
-    rt_uint8_t  type;                                   /**< type of object */
-    rt_uint8_t  flags;                                  /**< thread's flags */
-
-#ifdef RT_USING_MODULE
-    void       *module_id;                              /**< id of application module */
-#endif
-
-    rt_list_t   list;                                   /**< the object list */
-    rt_list_t   tlist;                                  /**< the thread list */
-
-    /* stack point and entry */
-    void       *sp;                                     /**< stack point */
-
-	/* modify for ESP32 */
-    xMPU_SETTINGS xMPUSettings;                         /**< MPU settings */
-    BaseType_t    xCoreID;                              /**< coreid */
-    struct _reent xNewLib_reent;                        /**< reent */
-    void *xtls[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
-    TlsDeleteCallbackFunction_t xtls_call[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
-
-    void       *entry;                                  /**< entry */
-    void       *parameter;                              /**< parameter */
-    void       *stack_addr;                             /**< stack address */
-    rt_uint32_t stack_size;                             /**< stack size */
-
-    /* error code */
-    rt_err_t    error;                                  /**< error code */
-
-    rt_uint8_t  stat;                                   /**< thread stat */
-
-    /* priority */
-    rt_uint8_t  current_priority;                       /**< current priority */
-    rt_uint8_t  init_priority;                          /**< initialized priority */
-#if RT_THREAD_PRIORITY_MAX > 32
-    rt_uint8_t  number;
-    rt_uint8_t  high_mask;
-#endif
-    rt_uint32_t number_mask;
-
-#if defined(RT_USING_EVENT)
-    /* thread event */
-    rt_uint32_t event_set;
-    rt_uint8_t  event_info;
-#endif
-
-    rt_ubase_t  init_tick;                              /**< thread's initialized tick */
-    rt_ubase_t  remaining_tick;                         /**< remaining tick */
-
-    struct rt_timer thread_timer;                       /**< built-in thread timer */
-
-    void (*cleanup)(struct rt_thread *tid);             /**< cleanup function when thread exit */
-
-    rt_uint32_t user_data;                              /**< private user data beyond this thread */
-};
-typedef struct rt_thread *rt_thread_t;
+#define rt_thread xSTATIC_TCB
+typedef TaskHandle_t rt_thread_t;
 
 /*@}*/
 
@@ -567,35 +510,14 @@ struct rt_ipc_object
     rt_list_t        suspend_thread;                    /**< threads pended on this resource */
 };
 
-#ifdef RT_USING_SEMAPHORE
-/**
- * Semaphore structure
- */
-struct rt_semaphore
-{
-    struct rt_ipc_object parent;                        /**< inherit from ipc_object */
-
-    rt_uint16_t          value;                         /**< value of semaphore. */
-};
-typedef struct rt_semaphore *rt_sem_t;
+#ifdef xRT_USING_SEMAPHORE
+#define rt_semaphore xSTATIC_QUEUE
+typedef StaticQueue_t *rt_sem_t;
 #endif
 
-#ifdef RT_USING_MUTEX
-/**
- * Mutual exclusion (mutex) structure
- */
-struct rt_mutex
-{
-    struct rt_ipc_object parent;                        /**< inherit from ipc_object */
-
-    rt_uint16_t          value;                         /**< value of mutex */
-
-    rt_uint8_t           original_priority;             /**< priority of last thread hold the mutex */
-    rt_uint8_t           hold;                          /**< numbers of thread hold the mutex */
-
-    struct rt_thread    *owner;                         /**< current owner of mutex */
-};
-typedef struct rt_mutex *rt_mutex_t;
+#ifdef xRT_USING_MUTEX
+#define rt_mutex xSTATIC_QUEUE
+typedef StaticQueue_t *rt_mutex_t;
 #endif
 
 #ifdef RT_USING_EVENT
