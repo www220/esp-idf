@@ -108,6 +108,7 @@ rt_inline void object_split(int len)
     while (len--) rt_kprintf("-");
 }
 
+#if 0
 static long _list_thread(struct rt_list_node *list)
 {
     int maxlen;
@@ -121,7 +122,6 @@ static long _list_thread(struct rt_list_node *list)
     rt_kprintf(     " ---  ------- ---------- ----------  ------  ---------- ---\n");
     for (node = list->next; node != list; node = node->next)
     {
-#if 0
         thread = rt_list_entry(node, struct rt_thread, list);
         rt_kprintf("%-*.*s %3d ", maxlen, RT_NAME_MAX, thread->name, thread->current_priority);
 
@@ -140,15 +140,25 @@ static long _list_thread(struct rt_list_node *list)
                         / thread->stack_size,
                    thread->remaining_tick,
                    thread->error);
-#endif
     }
 
     return 0;
 }
+#endif
 
 long list_thread(void)
 {
+#if 0
     return _list_thread(&rt_object_container[RT_Object_Class_Thread].object_list);
+#else
+	char *pcWriteBuffer = rt_malloc(4096);
+    rt_kputs("-----------------------------------------------\n");
+	vTaskList(pcWriteBuffer);
+	rt_kputs(pcWriteBuffer);
+    rt_kputs("-----------------------------------------------\n");
+	rt_free(pcWriteBuffer);
+	return 0;
+#endif
 }
 FINSH_FUNCTION_EXPORT(list_thread, list thread);
 MSH_CMD_EXPORT(list_thread, list thread);
