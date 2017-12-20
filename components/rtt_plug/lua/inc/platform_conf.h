@@ -13,6 +13,7 @@
   _ROM (LUA_MATHLIBNAME, luaopen_math, math_map )\
   _ROM (LUA_TABLIBNAME, luaopen_table, tab_funcs )\
   _ROM( AUXLIB_IOSCAN, luaopen_ioscan, ioscan_map )\
+  _ROM( AUXLIB_DSERVE, luaopen_dserve, dserve_map )\
   _ROM( AUXLIB_PACK, luaopen_pack, pack_map )\
   _ROM( AUXLIB_BIT, luaopen_bit, bit_map )
 
