@@ -69,4 +69,9 @@
 #define RT_USING_DFS
 #define DFS_USING_WORKDIR
 
+/* Using LWIP */
+#define RT_USING_LWIP
+#define RT_LWIP_DNS
+#define RT_LWIP_TCP
+
 #endif

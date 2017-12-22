@@ -410,7 +410,11 @@ esp_err_t tcpip_adapter_set_ip_info(tcpip_adapter_if_t tcpip_if, tcpip_adapter_i
         netif_set_addr(p_netif, &ip_info->ip, &ip_info->netmask, &ip_info->gw);
         if (!(ip4_addr_isany_val(ip_info->ip) || ip4_addr_isany_val(ip_info->netmask) || ip4_addr_isany_val(ip_info->gw))) {
             system_event_t evt;
-            evt.event_id = SYSTEM_EVENT_STA_GOT_IP;
+            if (tcpip_if == TCPIP_ADAPTER_IF_ETH) {
+                evt.event_id = SYSTEM_EVENT_ETH_GOT_IP;
+            } else {
+                evt.event_id = SYSTEM_EVENT_STA_GOT_IP;
+            }
             evt.event_info.got_ip.ip_changed = false;
 
             if (memcmp(ip_info, &esp_ip_old[tcpip_if], sizeof(tcpip_adapter_ip_info_t))) {

@@ -330,10 +330,11 @@ int cmd_dns(int argc, char **argv)
 
 #if (LWIP_VERSION) < 0x02000000U
         ip_addr_t ip_addr;
+		const ip_addr_t *ip_addr_p = &ip_addr;
         for(index=0; index<DNS_MAX_SERVERS; index++)
         {
             ip_addr = dns_getserver(index);
-            rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(&ip_addr));
+            rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(ip_addr_p));
         }
 #else
         const ip_addr_t *ip_addr;

@@ -156,7 +156,7 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     SET_PERI_REG_MASK(UART_CONF0_REG(uart_num), UART_INVERSE_DISABLE);
     //
 	UART[uart_num]->conf1.rx_flow_thrhd = UART_FULL_THRESH_DEFAULT;
-    if(cfg->reserved & UART_HW_FLOWCTRL_RTS)
+    if(cfg->reserved & UART_HW_FLOWCTRL_RTS || uart_num == 2)
         UART[uart_num]->conf1.rx_flow_en = 1;
     else
         UART[uart_num]->conf1.rx_flow_en = 0;
@@ -416,6 +416,23 @@ void rt_hw_usart_init()
     rt_hw_serial_register(&serial2, "uart1", 
         RT_DEVICE_FLAG_RDWR|RT_DEVICE_FLAG_INT_RX, &uart2);
 #endif
+}
+
+rt_size_t rt_device_write_485(rt_device_t dev, rt_off_t pos, const void *buffer, rt_size_t size)
+{
+    struct esp32_uart* uart = (struct esp32_uart *)dev->user_data;
+    uint8_t uart_num = uart->num;
+	
+	if (uart_num == 1){
+		gpio_set_level(GPIO_NUM_5, 1);
+		int ret = rt_device_write(dev, pos, buffer, size);
+		while (UART[uart_num]->status.txfifo_cnt);
+		uart_tx_wait_idle(uart_num);
+		gpio_set_level(GPIO_NUM_5, 0);
+    	return ret;
+	}else{
+    	return rt_device_write(dev, pos, buffer, size);
+	}
 }
 
 #define ETH_PHY_ADDR  0
@@ -699,6 +716,7 @@ int rt_hw_telnet_init(void)
 volatile int eth_linkstatus = 0;
 volatile int sys_stauts = -1;
 volatile int ppp_linkstatus = 0;
+volatile int wifi_linkstatus = 0;
 volatile int uptime_count = 0;
 
 unsigned char PZ[4] = {0};
@@ -740,6 +758,167 @@ void rt_hw_board_init(void)
     putenv("TZ=CST-8:00");
     tzset();
 }
+
+#ifdef RT_USING_LWIP
+#include <lwip/tcp.h>
+#include <lwip/priv/tcp_priv.h>
+#include <lwip/netif.h>
+#include <lwip/inet.h>
+#include <lwip/dns.h>
+#include <string.h>
+
+void set_if(char* netif_name, char* ip_addr, char* gw_addr, char* nm_addr)
+{
+    ip_addr_t addr;
+    const ip4_addr_t *ip = &addr.u_addr.ip4;
+    struct netif * netif = netif_list;
+
+    if(rt_strlen(netif_name) > sizeof(netif->name))
+    {
+        rt_kprintf("network interface name too long!\r\n");
+        return;
+    }
+
+    while(netif != RT_NULL)
+    {
+        if(rt_strncmp(netif_name, netif->name, sizeof(netif->name)) == 0)
+            break;
+
+        netif = netif->next;
+        if( netif == RT_NULL )
+        {
+            rt_kprintf("network interface: %s not found!\r\n", netif_name);
+            return;
+        }
+    }
+
+    /* set ip address */
+    if ((ip_addr != RT_NULL) && ipaddr_aton(ip_addr, &addr))
+    {
+        netif_set_ipaddr(netif, ip);
+    }
+
+    /* set gateway address */
+    if ((gw_addr != RT_NULL) && ipaddr_aton(gw_addr, &addr))
+    {
+        netif_set_gw(netif, ip);
+    }
+
+    /* set netmask address */
+    if ((nm_addr != RT_NULL) && ipaddr_aton(nm_addr, &addr))
+    {
+        netif_set_netmask(netif, ip);
+    }
+}
+
+void list_if(void)
+{
+    rt_ubase_t index;
+    struct netif * netif;
+
+    rt_enter_critical();
+    netif = netif_list;
+    while( netif != RT_NULL )
+    {
+        rt_kprintf("network interface: %c%c%s\n",
+                   netif->name[0],
+                   netif->name[1],
+                   (netif == netif_default)?" (Default)":"");
+        rt_kprintf("MTU: %d\n", netif->mtu);
+        rt_kprintf("MAC: ");
+        for (index = 0; index < netif->hwaddr_len; index ++)
+            rt_kprintf("%02x ", netif->hwaddr[index]);
+        rt_kprintf("\nFLAGS:");
+        if (netif->flags & NETIF_FLAG_UP) rt_kprintf(" UP");
+        else rt_kprintf(" DOWN");
+        if (netif->flags & NETIF_FLAG_LINK_UP) rt_kprintf(" LINK_UP");
+        else rt_kprintf(" LINK_DOWN");
+        if (netif->flags & NETIF_FLAG_ETHARP) rt_kprintf(" ETHARP");
+        if (netif->flags & NETIF_FLAG_IGMP) rt_kprintf(" IGMP");
+        rt_kprintf("\n");
+        rt_kprintf("ip address: %s\n", ipaddr_ntoa(&(netif->ip_addr)));
+        rt_kprintf("gw address: %s\n", ipaddr_ntoa(&(netif->gw)));
+        rt_kprintf("net mask  : %s\n", ipaddr_ntoa(&(netif->netmask)));
+        rt_kprintf("\r\n");
+
+        netif = netif->next;
+    }
+    rt_exit_critical();
+
+#if LWIP_DNS
+	extern int cmd_dns(int argc, char **argv);
+	cmd_dns(1, NULL);
+#endif /**< #if LWIP_DNS */
+}
+
+void list_tcps(void)
+{
+    rt_uint32_t num = 0;
+    struct tcp_pcb *pcb;
+    char local_ip_str[16];
+    char remote_ip_str[16];
+
+    extern struct tcp_pcb *tcp_active_pcbs;
+    extern union tcp_listen_pcbs_t tcp_listen_pcbs;
+    extern struct tcp_pcb *tcp_tw_pcbs;
+
+    rt_enter_critical();
+    rt_kprintf("Active PCB states:\n");
+    for(pcb = tcp_active_pcbs; pcb != NULL; pcb = pcb->next)
+    {
+        strcpy(local_ip_str, ipaddr_ntoa(&(pcb->local_ip)));
+        strcpy(remote_ip_str, ipaddr_ntoa(&(pcb->remote_ip)));
+
+        rt_kprintf("#%d %s:%d <==> %s:%d snd_nxt 0x%08X rcv_nxt 0x%08X ",
+                   num++,
+                   local_ip_str,
+                   pcb->local_port,
+                   remote_ip_str,
+                   pcb->remote_port,
+                   pcb->snd_nxt,
+                   pcb->rcv_nxt);
+        rt_kprintf("state: %s\n", tcp_debug_state_str(pcb->state));
+    }
+
+    rt_kprintf("Listen PCB states:\n");
+    num = 0;
+    for(pcb = (struct tcp_pcb *)tcp_listen_pcbs.pcbs; pcb != NULL; pcb = pcb->next)
+    {
+        rt_kprintf("#%d local port %d ", num++, pcb->local_port);
+        rt_kprintf("state: %s\n", tcp_debug_state_str(pcb->state));
+    }
+
+    rt_kprintf("TIME-WAIT PCB states:\n");
+    num = 0;
+    for(pcb = tcp_tw_pcbs; pcb != NULL; pcb = pcb->next)
+    {
+        strcpy(local_ip_str, ipaddr_ntoa(&(pcb->local_ip)));
+        strcpy(remote_ip_str, ipaddr_ntoa(&(pcb->remote_ip)));
+
+        rt_kprintf("#%d %s:%d <==> %s:%d snd_nxt 0x%08X rcv_nxt 0x%08X ",
+                   num++,
+                   local_ip_str,
+                   pcb->local_port,
+                   remote_ip_str,
+                   pcb->remote_port,
+                   pcb->snd_nxt,
+                   pcb->rcv_nxt);
+        rt_kprintf("state: %s\n", tcp_debug_state_str(pcb->state));
+    }
+    rt_exit_critical();
+}
+
+#if LWIP_DNS
+void set_dns(char* dns_server)
+{
+    ip_addr_t addr;
+    if ((dns_server != RT_NULL) && ipaddr_aton(dns_server, &addr))
+    {
+        dns_setserver(DNS_FALLBACK_SERVER_INDEX, &addr);
+    }
+}
+#endif
+#endif
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
@@ -799,6 +978,24 @@ void cmd_date(int argc, char **argv)
     rt_kprintf("%s\n", ctime(&now));
 }
 MSH_CMD_EXPORT_ALIAS(cmd_date, date, show date and time.)
+
+void cmd_reboot(int argc, char **argv)
+{
+    rt_kprintf("sys reboot\n");
+    rt_thread_delay(1000);
+    esp_restart();
+    rt_thread_delay(60000);
+}
+MSH_CMD_EXPORT_ALIAS(cmd_reboot, reboot, reboot esp.)
+
+extern void rt_usage_info(rt_uint32_t *major, rt_uint32_t *minor);
+void cmd_cpusage(int argc, char **argv)
+{
+	rt_uint32_t cpu_usage_major,cpu_usage_minor;
+	rt_usage_info(&cpu_usage_major, &cpu_usage_minor);
+    rt_kprintf("Cpu Usage: %d.%d%%\n",cpu_usage_major,cpu_usage_minor);
+}
+MSH_CMD_EXPORT_ALIAS(cmd_cpusage, cpusage, cpu usage.)
 
 extern int lua_main (int argc, char **argv);
 MSH_CMD_EXPORT_ALIAS(lua_main, lua, LUA run engine.);

@@ -43,6 +43,7 @@ int rt_hw_telnet_init(void);
 extern volatile int eth_linkstatus;
 extern volatile int sys_stauts;
 extern volatile int ppp_linkstauts;
+extern volatile int wifi_linkstatus;
 extern volatile int uptime_count;
 extern unsigned char PZ[4];
 extern char RTT_USER[16];
@@ -58,6 +59,7 @@ int SetPrivateStringData(const char *name, const char *buf, const char *file);
 
 extern unsigned xthal_get_ccount(void);
 inline uint32_t rt_hw_cpu_ms() { return xthal_get_ccount() / (CPU_CLK_FREQ_ROM / 1000); }
+int sym_settimenow(int time);
 
 #endif
 

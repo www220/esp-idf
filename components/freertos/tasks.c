@@ -2401,6 +2401,39 @@ UBaseType_t uxTaskGetNumberOfTasks( void )
 #endif /* configUSE_TRACE_FACILITY */
 /*----------------------------------------------------------*/
 
+#if ( configGENERATE_RUN_TIME_STATS == 1 )
+void rt_usage_info(uint32_t *major, uint32_t *minor)
+{
+	TCB_t *pxTCB;
+	uint32_t ulBase,ulIdle;
+	static uint32_t ulTotalTime = 0;
+	
+	#ifdef portALT_GET_RUN_TIME_COUNTER_VALUE
+		portALT_GET_RUN_TIME_COUNTER_VALUE( ulIdle );
+	#else
+		ulIdle = portGET_RUN_TIME_COUNTER_VALUE();
+	#endif
+	ulBase = ulIdle - ulTotalTime;
+	ulTotalTime = ulIdle;
+	
+	pxTCB = prvGetTCBFromHandle(xIdleTaskHandle[xPortGetCoreID()]);
+	ulIdle = pxTCB->ulRunTimeCounter;
+	pxTCB->ulRunTimeCounter = 0;
+	
+	if (ulBase < ulIdle) ulIdle = 0xffffffff-ulIdle;
+	if (ulBase==0){
+		*major = 0;
+		*major = 0;
+	}else{
+		double usage = 1.0-(double)ulIdle/(double)ulBase;
+		*major = usage*10000;
+		*minor = (*major)%100;
+		*major /= 100;
+	}
+}
+#endif /* configUSE_TRACE_FACILITY */
+/*----------------------------------------------------------*/
+
 #if ( INCLUDE_xTaskGetIdleTaskHandle == 1 )
 
 	TaskHandle_t xTaskGetIdleTaskHandle( void )
