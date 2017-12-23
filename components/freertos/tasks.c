@@ -2426,9 +2426,9 @@ void rt_usage_info(uint32_t *major, uint32_t *minor)
 		*major = 0;
 	}else{
 		double usage = 1.0-(double)ulIdle/(double)ulBase;
-		*major = usage*10000;
-		*minor = (*major)%100;
-		*major /= 100;
+		*major = usage*1000;
+		*minor = (*major)%10;
+		*major /= 10;
 	}
 }
 #endif /* configUSE_TRACE_FACILITY */

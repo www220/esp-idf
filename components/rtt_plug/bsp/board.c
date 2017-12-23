@@ -20,6 +20,7 @@
 #include "eth_phy/phy_lan8720.h"
 
 #include <thread_esp32.h>
+#include <sys/time.h>
 
 #define UART_FULL_THRESH_DEFAULT  (120)
 #define UART_TOUT_THRESH_DEFAULT   (10)
@@ -266,12 +267,12 @@ static struct rt_serial_device serial0;
 static struct esp32_uart uart0 = { UART_NUM_0, UART_INTR_NUM_0 };
 #endif
 
-#ifdef RT_USING_UART1
+#ifdef RT_USING_UART2
 static struct rt_serial_device serial1;
 static struct esp32_uart uart1 = { UART_NUM_1, UART_INTR_NUM_1 };
 #endif
 
-#ifdef RT_USING_UART2
+#ifdef RT_USING_UART1
 static struct rt_serial_device serial2;
 static struct esp32_uart uart2 = { UART_NUM_2, UART_INTR_NUM_2 };
 #endif
@@ -432,6 +433,171 @@ rt_size_t rt_device_write_485(rt_device_t dev, rt_off_t pos, const void *buffer,
     	return ret;
 	}else{
     	return rt_device_write(dev, pos, buffer, size);
+	}
+}
+
+#define I2C_MASTER_SDA_GPIO GPIO_NUM_13
+#define I2C_MASTER_SCL_GPIO GPIO_NUM_4
+static void gpio_set_sda(void *data, rt_int32_t state)
+{
+	gpio_set_level(I2C_MASTER_SDA_GPIO, state);
+}
+
+static void gpio_set_scl(void *data, rt_int32_t state)
+{
+	gpio_set_level(I2C_MASTER_SCL_GPIO, state);
+}
+
+static rt_int32_t gpio_get_sda(void *data)
+{
+   return gpio_get_level(I2C_MASTER_SDA_GPIO);
+}
+
+static rt_int32_t gpio_get_scl(void *data)
+{
+    return gpio_get_level(I2C_MASTER_SCL_GPIO);
+}
+
+static void gpio_udelay(rt_uint32_t us)
+{
+    ets_delay_us(us);
+}
+
+static const struct rt_i2c_bit_ops _i2c_bit_ops =
+{
+    NULL,
+    gpio_set_sda,
+    gpio_set_scl,
+    gpio_get_sda,
+    gpio_get_scl,
+    gpio_udelay,
+    10,
+    10
+};
+static struct rt_i2c_bus_device i2c_device;
+
+void rt_hw_i2c_init()
+{
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_4)) rtc_gpio_deinit(GPIO_NUM_4);
+	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_13)) rtc_gpio_deinit(GPIO_NUM_13);
+	gpio_set_level(GPIO_NUM_4, 1);
+	gpio_set_level(GPIO_NUM_13, 1);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_4], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_4, GPIO_FLOATING);
+	gpio_set_direction(GPIO_NUM_4, GPIO_MODE_INPUT_OUTPUT_OD);
+	gpio_matrix_out(GPIO_NUM_4, SIG_GPIO_OUT_IDX, 0, 0);
+	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_13], PIN_FUNC_GPIO);
+	gpio_set_pull_mode(GPIO_NUM_13, GPIO_FLOATING);
+	gpio_set_direction(GPIO_NUM_13, GPIO_MODE_INPUT_OUTPUT_OD);
+	gpio_matrix_out(GPIO_NUM_13, SIG_GPIO_OUT_IDX, 0, 0);
+	
+    i2c_device.priv = (void *)&_i2c_bit_ops;
+    rt_i2c_bit_add_bus(&i2c_device, "i2c");
+}
+
+static inline unsigned int bcd2bin(rt_uint8_t val)
+{
+	return ((val) & 0x0f) + ((val) >> 4) * 10;
+}
+
+static inline rt_uint8_t bin2bcd (unsigned int val)
+{
+	return (((val / 10) << 4) | (val % 10));
+}
+
+int init_ds3231(void)
+{
+    uint8_t d[2] = { 0x0e, 0x0c };
+    if (rt_i2c_master_send(&i2c_device, 0x68, 0, d, 2) != 2)
+		return 0;
+	return 1;
+}
+
+int load_ds3231(void)
+{
+    uint8_t sec[7] = { 0x00 };
+    if (rt_i2c_master_send(&i2c_device, 0x68, 0, sec, 1) != 1)
+        return 0;
+    if (rt_i2c_master_recv(&i2c_device, 0x68, 0, sec, 7) != 7)
+        return 0;
+	struct tm t;
+	t.tm_sec = bcd2bin(sec[0]&0x7f);
+	t.tm_min = bcd2bin(sec[1]&0x7f);
+	t.tm_hour = bcd2bin(sec[2]&0x3f);
+	t.tm_mday = bcd2bin(sec[4]&0x3f);
+	t.tm_mon = bcd2bin(sec[5]&0x1f)-1;
+	t.tm_year = 100+bcd2bin(sec[6]);
+    struct timeval tv_set;
+    tv_set.tv_sec = mktime(&t);
+    tv_set.tv_usec = 0;
+    settimeofday(&tv_set, NULL);
+	printf("time updated %s",ctime(&tv_set.tv_sec));
+    return 1;
+}
+
+int save_ds3231(int time)
+{
+	struct tm t;
+	t = *localtime((time_t *)&time);
+	rt_uint8_t sec[8] = {
+		0x00,
+		bin2bcd(t.tm_sec),
+		bin2bcd(t.tm_min),
+		bin2bcd(t.tm_hour),
+		bin2bcd(t.tm_wday+1),
+		bin2bcd(t.tm_mday),
+		bin2bcd(t.tm_mon+1),
+		bin2bcd(t.tm_year%100)};
+	if (rt_i2c_master_send(&i2c_device, 0x68, 0, sec, 8) != 8)
+		return 0;
+	return 1;
+}
+
+void init_rtc(void)
+{
+	int i;
+	for (i=0; i<3; i++)
+	{
+		rt_tick_t tnow = rt_tick_get();
+		rt_kprintf("init ds3231\n");
+		if (init_ds3231()!=0)
+		{
+			rt_kprintf("init ds3231 success:%d\n", rt_tick_get()-tnow);
+			break;
+		}
+		rt_kprintf("init ds3231 timeout:%d\n", rt_tick_get()-tnow);
+	}
+}
+
+void loadrtc(void)
+{
+	int i;
+	for (i=0; i<3; i++)
+	{
+		rt_tick_t tnow = rt_tick_get();
+		rt_kprintf("read ds3231\n");
+		if (load_ds3231()!=0)
+		{
+			rt_kprintf("read ds3231 success:%d\n", rt_tick_get()-tnow);
+			break;
+		}
+		rt_kprintf("read ds3231 timeout:%d\n", rt_tick_get()-tnow);
+	}
+}
+
+void savertc(int time)
+{
+	int i;
+	for (i=0; i<3; i++)
+	{
+		rt_tick_t tnow = rt_tick_get();
+		rt_kprintf("write ds3231\n");
+		if (save_ds3231(time)!=0)
+		{
+			rt_kprintf("write ds3231 success:%d\n", rt_tick_get()-tnow);
+			break;
+		}
+		rt_kprintf("write ds3231 timeout:%d\n", rt_tick_get()-tnow);
 	}
 }
 
@@ -722,6 +888,7 @@ volatile int uptime_count = 0;
 unsigned char PZ[4] = {0};
 char RTT_USER[16] = {"admin"};
 char RTT_PASS[36] = {"21232f297a57a5a743894a0e4a801fc3"};
+char RTT_NTP[32] = {"www.baidu.com"};
 unsigned long long RTT_PRJNO = 0;
 
 static void rt_hw_write_char(char c)
@@ -734,18 +901,18 @@ static void rt_hw_write_char(char c)
 }
 void rt_hw_board_init(void)
 {
-	/* initialize gpio */
+	/* initialize led gpio */
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_15)) rtc_gpio_deinit(GPIO_NUM_15);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_15], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_15, GPIO_PULLUP_ONLY);
 	gpio_set_level(GPIO_NUM_15, 1);
 	gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
-	gpio_matrix_out(GPIO_NUM_15, SIG_GPIO_OUT_IDX, 0, 0);
+	gpio_matrix_out(GPIO_NUM_15, SIG_GPIO_OUT_IDX, 0, 0);	
+	/* initialize key gpio */
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_35)) rtc_gpio_deinit(GPIO_NUM_35);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_35], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_35, GPIO_PULLUP_ONLY);
 	gpio_set_direction(GPIO_NUM_35, GPIO_MODE_INPUT);
-	gpio_matrix_out(GPIO_NUM_35, SIG_GPIO_OUT_IDX, 0, 0);
     /* initialize uart */
     rt_hw_usart_init();
 #ifdef RT_USING_CONSOLE
@@ -753,6 +920,8 @@ void rt_hw_board_init(void)
 #endif
     ets_install_putc1(rt_hw_write_char);
     ets_install_putc2(NULL);
+	/* initialize i2c */
+    rt_hw_i2c_init();
 
 	/* set cst */
     putenv("TZ=CST-8:00");
@@ -816,7 +985,6 @@ void list_if(void)
     rt_ubase_t index;
     struct netif * netif;
 
-    rt_enter_critical();
     netif = netif_list;
     while( netif != RT_NULL )
     {
@@ -843,7 +1011,6 @@ void list_if(void)
 
         netif = netif->next;
     }
-    rt_exit_critical();
 
 #if LWIP_DNS
 	extern int cmd_dns(int argc, char **argv);
@@ -862,7 +1029,6 @@ void list_tcps(void)
     extern union tcp_listen_pcbs_t tcp_listen_pcbs;
     extern struct tcp_pcb *tcp_tw_pcbs;
 
-    rt_enter_critical();
     rt_kprintf("Active PCB states:\n");
     for(pcb = tcp_active_pcbs; pcb != NULL; pcb = pcb->next)
     {
@@ -905,7 +1071,6 @@ void list_tcps(void)
                    pcb->rcv_nxt);
         rt_kprintf("state: %s\n", tcp_debug_state_str(pcb->state));
     }
-    rt_exit_critical();
 }
 
 #if LWIP_DNS

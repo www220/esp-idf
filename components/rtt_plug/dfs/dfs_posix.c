@@ -317,15 +317,17 @@ void ls(const char *pathname)
 
 int dfs_mkfs(const char *fs_name, const char *device_name)
 {
-    const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "storage");
+	int sub = (fs_name==NULL||!strcasecmp(fs_name,"fat"))?ESP_PARTITION_SUBTYPE_DATA_FAT:ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
+    const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, sub, device_name);
 	if (part == NULL)
 	{
-		rt_kprintf("No such part storage\n");
+		rt_kprintf("No such type %s part %s\n", fs_name, device_name);
+		rt_kprintf("mkfs fat storage or mkfs spiffs syscfg\n", device_name);
 		return RT_ERROR;
 	}
-	rt_kprintf("part storage begin:%x,size:%x\n", part->address, part->size);
+	rt_kprintf("part %s begin:%x,size:%x\n", device_name, part->address, part->size);
 	rt_tick_t t1 = rt_tick_get();
 	esp_partition_erase_range(part, 0, part->size);
-	rt_kprintf("part storage finish to erase elapsed:%d\n", rt_tick_get()-t1);
+	rt_kprintf("part %s finish to erase elapsed:%d\n", device_name, rt_tick_get()-t1);
     return RT_EOK;
 }

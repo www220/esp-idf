@@ -42,12 +42,13 @@ int rt_hw_telnet_init(void);
 
 extern volatile int eth_linkstatus;
 extern volatile int sys_stauts;
-extern volatile int ppp_linkstauts;
+extern volatile int ppp_linkstatus;
 extern volatile int wifi_linkstatus;
 extern volatile int uptime_count;
 extern unsigned char PZ[4];
 extern char RTT_USER[16];
 extern char RTT_PASS[36];
+extern char RTT_NTP[32];
 extern unsigned long long RTT_PRJNO;
 
 #define rttIoScanDir "/spi/ioscan"
