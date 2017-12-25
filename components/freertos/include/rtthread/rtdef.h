@@ -520,24 +520,12 @@ typedef StaticQueue_t *rt_sem_t;
 typedef StaticQueue_t *rt_mutex_t;
 #endif
 
-#ifdef RT_USING_EVENT
-/**
- * flag defintions in event
- */
+#ifdef xRT_USING_EVENT
 #define RT_EVENT_FLAG_AND               0x01            /**< logic and */
 #define RT_EVENT_FLAG_OR                0x02            /**< logic or */
 #define RT_EVENT_FLAG_CLEAR             0x04            /**< clear flag */
-
-/*
- * event structure
- */
-struct rt_event
-{
-    struct rt_ipc_object parent;                        /**< inherit from ipc_object */
-
-    rt_uint32_t          set;                           /**< event set */
-};
-typedef struct rt_event *rt_event_t;
+#define rt_event xSTATIC_EVENT_GROUP
+typedef StaticEventGroup_t *rt_event_t;
 #endif
 
 #ifdef RT_USING_MAILBOX

@@ -995,7 +995,7 @@ typedef StaticQueue_t StaticSemaphore_t;
  * obfuscated in the hope users will recognise that it would be unwise to make
  * direct use of the structure members.
  */
-typedef struct xSTATIC_EVENT_GROUP
+struct xSTATIC_EVENT_GROUP
 {
 	TickType_t xDummy1;
 	StaticList_t xDummy2;
@@ -1010,7 +1010,8 @@ typedef struct xSTATIC_EVENT_GROUP
 
 	portMUX_TYPE muxDummy;		//Mutex required due to SMP
 
-} StaticEventGroup_t;
+};
+typedef struct xSTATIC_EVENT_GROUP StaticEventGroup_t;
 
 /*
  * In line with software engineering best practice, especially when supplying a

@@ -307,7 +307,7 @@ rt_err_t rt_mutex_release(rt_mutex_t mutex);
 rt_err_t rt_mutex_control(rt_mutex_t mutex, rt_uint8_t cmd, void *arg);
 #endif
 
-#ifdef RT_USING_EVENT
+#ifdef xRT_USING_EVENT
 /*
  * event interface
  */

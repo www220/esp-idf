@@ -33,6 +33,7 @@
 #define RT_USING_HEAP
 #define xRT_USING_SEMAPHORE
 #define xRT_USING_MUTEX
+#define xRT_USING_EVENT
 
 /* SECTION: Device System */
 /* Using Device System */

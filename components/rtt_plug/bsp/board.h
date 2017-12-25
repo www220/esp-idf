@@ -35,6 +35,7 @@
 
 #define CONSOLE_DEVICE "uart0"
 #define FINSH_DEVICE_NAME "telnet"
+#define PPP_DEVICE_NAME "uart0"
 
 void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
