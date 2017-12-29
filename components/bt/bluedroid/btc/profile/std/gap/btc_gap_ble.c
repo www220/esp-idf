@@ -130,6 +130,9 @@ static esp_bt_status_t btc_hci_to_esp_status(uint8_t hci_status)
         case HCI_ERR_ILLEGAL_PARAMETER_FMT:
             esp_status = ESP_BT_STATUS_ERR_ILLEGAL_PARAMETER_FMT;
             break;
+        case HCI_ERR_MEMORY_FULL:
+            esp_status = ESP_BT_STATUS_MEMORY_FULL;
+            break;
         default:
             esp_status = ESP_BT_STATUS_FAIL;
             break;
@@ -438,7 +441,7 @@ static void btc_ble_set_scan_rsp_data_raw(uint8_t *raw_scan_rsp, uint32_t raw_sc
     BTA_DmBleSetScanRspRaw(raw_scan_rsp, raw_scan_rsp_len, p_scan_rsp_data_cback);
 }
 
-static void btc_start_adv_callback(tBTA_STATUS status)
+static void btc_start_adv_callback(uint8_t status)
 {
     esp_ble_gap_cb_param_t param;
     bt_status_t ret;
@@ -447,7 +450,7 @@ static void btc_start_adv_callback(tBTA_STATUS status)
     msg.sig = BTC_SIG_API_CB;
     msg.pid = BTC_PID_GAP_BLE;
     msg.act = ESP_GAP_BLE_ADV_START_COMPLETE_EVT;
-    param.adv_start_cmpl.status = status;
+    param.adv_start_cmpl.status = btc_hci_to_esp_status(status);
 
     ret = btc_transfer_context(&msg, &param,
                                sizeof(esp_ble_gap_cb_param_t), NULL);
@@ -457,7 +460,7 @@ static void btc_start_adv_callback(tBTA_STATUS status)
     }
 }
 
-static void btc_stop_adv_callback(tBTA_STATUS status)
+static void btc_stop_adv_callback(uint8_t status)
 {
     esp_ble_gap_cb_param_t param;
     bt_status_t ret;
@@ -466,7 +469,7 @@ static void btc_stop_adv_callback(tBTA_STATUS status)
     msg.sig = BTC_SIG_API_CB;
     msg.pid = BTC_PID_GAP_BLE;
     msg.act = ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT;
-    param.adv_stop_cmpl.status = status;
+    param.adv_stop_cmpl.status = btc_hci_to_esp_status(status);
 
     ret = btc_transfer_context(&msg, &param,
                                sizeof(esp_ble_gap_cb_param_t), NULL);
@@ -546,8 +549,8 @@ static void btc_ble_set_scan_params(esp_ble_scan_params_t *scan_params, tBLE_SCA
                                      scan_params->own_addr_type,
                                      scan_param_setup_cback);
     } else {
-		btc_scan_params_callback(ESP_DEFAULT_GATT_IF, BTM_ILLEGAL_VALUE);
-	}
+        btc_scan_params_callback(ESP_DEFAULT_GATT_IF, BTM_ILLEGAL_VALUE);
+    }
 }
 
 static void btc_search_callback(tBTA_DM_SEARCH_EVT event, tBTA_DM_SEARCH *p_data)
@@ -566,7 +569,7 @@ static void btc_search_callback(tBTA_DM_SEARCH_EVT event, tBTA_DM_SEARCH *p_data
         param.scan_rst.dev_type = p_data->inq_res.device_type;
         param.scan_rst.rssi = p_data->inq_res.rssi;
         param.scan_rst.ble_addr_type = p_data->inq_res.ble_addr_type;
-		param.scan_rst.ble_evt_type = p_data->inq_res.ble_evt_type;
+        param.scan_rst.ble_evt_type = p_data->inq_res.ble_evt_type;
         param.scan_rst.flag = p_data->inq_res.flag;
         param.scan_rst.num_resps = 1;
         param.scan_rst.adv_data_len = p_data->inq_res.adv_data_len;
@@ -601,7 +604,7 @@ static void btc_search_callback(tBTA_DM_SEARCH_EVT event, tBTA_DM_SEARCH *p_data
     btc_transfer_context(&msg, &param, sizeof(esp_ble_gap_cb_param_t), NULL);
 }
 
-static void btc_start_scan_callback(tBTA_STATUS status)
+static void btc_start_scan_callback(uint8_t status)
 {
     esp_ble_gap_cb_param_t param;
     bt_status_t ret;
@@ -1047,7 +1050,7 @@ void btc_gap_ble_call_handler(btc_msg_t *msg)
     }
     case BTC_GAP_BLE_ACT_CONFIG_LOCAL_PRIVACY:
         btc_ble_config_local_privacy(arg->cfg_local_privacy.privacy_enable, btc_set_local_privacy_callback);
-        break;    
+        break;
     case BTC_GAP_BLE_ACT_UPDATE_WHITE_LIST:
         BTA_DmUpdateWhiteList(arg->update_white_list.add_remove, arg->update_white_list.remote_bda, btc_add_whitelist_complete_callback);
         break;
@@ -1113,12 +1116,12 @@ void btc_gap_ble_call_handler(btc_msg_t *msg)
                 STREAM_TO_UINT8(key_size, arg->set_security_param.value);
                 bta_dm_co_ble_set_max_key_size(key_size);
                 break;
-            }        
+            }
             default:
                 break;
         }
         break;
-    }        
+    }
     case BTC_GAP_BLE_SECURITY_RSP_EVT: {
         BD_ADDR bd_addr;
         tBTA_DM_BLE_SEC_GRANT res = arg->sec_rsp.accept ? BTA_DM_SEC_GRANTED : BTA_DM_SEC_PAIR_NOT_SPT;

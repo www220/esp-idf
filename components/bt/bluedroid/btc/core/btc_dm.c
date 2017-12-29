@@ -28,6 +28,9 @@
 #include "bta_gatt_api.h"
 #include "allocator.h"
 
+#if (BTC_GAP_BT_INCLUDED == TRUE)
+#include "btc_gap_bt.h"
+#endif /* BTC_GAP_BT_INCLUDED == TRUE */
 
 /******************************************************************************
 **  Constants & Macros
@@ -246,12 +249,6 @@ static void btc_dm_ble_auth_cmpl_evt (tBTA_DM_AUTH_CMPL *p_auth_cmpl)
                              (pairing_cb.bd_addr[4] << 8) + pairing_cb.bd_addr[5]);
          if (btc_storage_get_remote_addr_type(&bdaddr, &addr_type) != BT_STATUS_SUCCESS) {
             btc_storage_set_remote_addr_type(&bdaddr, p_auth_cmpl->addr_type, true);
-        }
-        /* check the irk has been save in the flash or not, if the irk has already save, means that the peer device has bonding
-           before. */
-        if(pairing_cb.ble.is_pid_key_rcvd) {
-            btc_storage_compare_address_key_value(&bdaddr, BTM_LE_KEY_PID,
-                                                  (void *)&pairing_cb.ble.pid_key, sizeof(tBTM_LE_PID_KEYS));
         }
         btc_dm_save_ble_bonding_keys();
     } else {
@@ -481,6 +478,14 @@ void btc_dm_sec_cb_handler(btc_msg_t *msg)
         break;
     }
     case BTA_DM_BUSY_LEVEL_EVT:
+#if (BTC_GAP_BT_INCLUDED == TRUE)
+        {
+        if (p_data->busy_level.level_flags & BTM_BL_INQUIRY_PAGING_MASK) {
+            btc_gap_bt_busy_level_updated(p_data->busy_level.level_flags);
+        }
+        break;
+        }
+#endif /* BTC_GAP_BT_INCLUDED  == TRUE */
     case BTA_DM_LINK_UP_EVT:
     case BTA_DM_LINK_DOWN_EVT:
     case BTA_DM_HW_ERROR_EVT:
