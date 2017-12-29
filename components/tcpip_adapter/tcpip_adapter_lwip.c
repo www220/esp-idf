@@ -139,14 +139,28 @@ static int tcpip_adapter_ipc_check(tcpip_adapter_api_msg_t *msg)
 #endif
 }
 
-static esp_err_t tcpip_adapter_update_default_netif(void)
+esp_err_t tcpip_adapter_update_default_netif(struct netif *netif)
 {
-    if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_STA])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_STA]);
-    } else if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_ETH])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_ETH]);
-    } else if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_AP])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_AP]);
+    if (netif != NULL){
+        netif_set_default(netif);
+        return ESP_OK;
+    }
+
+    if (netif_default == esp_netif[TCPIP_ADAPTER_IF_STA]
+        || netif_default == esp_netif[TCPIP_ADAPTER_IF_ETH]
+        || netif_default == esp_netif[TCPIP_ADAPTER_IF_AP]
+        || netif_default == NULL){
+        int i;
+        ip4_addr_t addr;
+        for (i=0; i<TCPIP_ADAPTER_IF_MAX; i++){
+            netif = esp_netif[i];
+            if (netif_is_up(netif)){
+                addr = *netif_ip4_gw(netif);
+                if (addr.addr != IPADDR_NONE && addr.addr != IPADDR_ANY) break;
+            }
+            if (i+1 == TCPIP_ADAPTER_IF_MAX) netif = NULL;
+        }
+        netif_set_default(netif);
     }
 
     return ESP_OK;
@@ -190,7 +204,7 @@ esp_err_t tcpip_adapter_start(tcpip_adapter_if_t tcpip_if, uint8_t *mac, tcpip_a
         }
     }
 
-    tcpip_adapter_update_default_netif();
+    tcpip_adapter_update_default_netif(NULL);
 
     return ESP_OK;
 }
@@ -252,7 +266,7 @@ esp_err_t tcpip_adapter_stop(tcpip_adapter_if_t tcpip_if)
 
     netif_set_down(esp_netif[tcpip_if]);
     netif_remove(esp_netif[tcpip_if]);
-    tcpip_adapter_update_default_netif();
+    tcpip_adapter_update_default_netif(NULL);
 
     return ESP_OK;
 }
@@ -277,7 +291,7 @@ esp_err_t tcpip_adapter_up(tcpip_adapter_if_t tcpip_if)
         netif_set_up(esp_netif[tcpip_if]);
     }
 
-    tcpip_adapter_update_default_netif();
+    tcpip_adapter_update_default_netif(NULL);
 
     return ESP_OK;
 }
@@ -310,7 +324,7 @@ esp_err_t tcpip_adapter_down(tcpip_adapter_if_t tcpip_if)
         tcpip_adapter_start_ip_lost_timer(tcpip_if);
     }
 
-    tcpip_adapter_update_default_netif();
+    tcpip_adapter_update_default_netif(NULL);
 
     return ESP_OK;
 }
