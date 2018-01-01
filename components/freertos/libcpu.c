@@ -25,12 +25,27 @@ void rtthread_startup(void)
     rt_system_object_init();
 }
 
+rt_err_t rt_event_send(rt_event_t event, rt_uint32_t set)
+{
+    if (xPortInIsrContext()){
+        BaseType_t higher_task_woken = pdFALSE;
+        xEventGroupSetBitsFromISR(event, set, &higher_task_woken);
+        if (higher_task_woken==pdTRUE) portYIELD_FROM_ISR();
+        return RT_EOK;
+    }
+    xEventGroupSetBits(event,set);
+    return RT_EOK;
+}
+
 rt_err_t rt_event_recv(rt_event_t event, rt_uint32_t set, rt_uint8_t opt, rt_int32_t timeout, rt_uint32_t *recved)
 {
-	rt_uint32_t ret = xEventGroupWaitBits(event,set,
+    if (xPortInIsrContext()){
+        configASSERT(0);
+        return -RT_ERROR;
+    }
+	rt_uint32_t ret = xEventGroupWaitBits(event, set,
 		((opt&RT_EVENT_FLAG_CLEAR)?(pdTRUE):pdFALSE),
-		((opt&RT_EVENT_FLAG_AND)?(pdTRUE):pdFALSE),
-		timeout);
+		((opt&RT_EVENT_FLAG_AND)?(pdTRUE):pdFALSE), timeout);
 	if (recved) *recved = (ret&set);
 	if (opt&RT_EVENT_FLAG_AND) return ((ret&set)==set)?RT_EOK:-RT_ERROR;
 	else if (opt&RT_EVENT_FLAG_OR) return (ret&set)?RT_EOK:-RT_ERROR;
@@ -105,7 +120,6 @@ void list_mem(void)
 }
 
 rt_err_t rt_event_init(rt_event_t event, const char *name, rt_uint8_t flag) { xEventGroupCreateStatic(event);return RT_EOK; }
-rt_err_t rt_event_send(rt_event_t event, rt_uint32_t set) { return xEventGroupSetBits(event,set)==set?RT_EOK:-RT_ERROR; }
 rt_err_t rt_mutex_init(rt_mutex_t mutex, const char *name, rt_uint8_t flag) { xSemaphoreCreateMutexStatic(mutex);return RT_EOK; }
 rt_err_t rt_mutex_take(rt_mutex_t mutex, rt_int32_t time) { return xSemaphoreTake(mutex,time)==pdPASS?RT_EOK:-RT_ETIMEOUT; }
 rt_err_t rt_mutex_release(rt_mutex_t mutex) { return xSemaphoreGive(mutex)==pdPASS?RT_EOK:-RT_ERROR; }

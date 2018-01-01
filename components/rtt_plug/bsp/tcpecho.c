@@ -49,6 +49,7 @@ void tcpecho_entry(void *parameter)
 			netconn_delete(newconn);
 		}
 	}
+    rt_thread_delete(NULL);
 }
 
 static rt_thread_t echo_tid = RT_NULL;

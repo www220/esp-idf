@@ -345,7 +345,7 @@ void rt_hw_usart_init()
 	gpio_matrix_in(GPIO_NUM_34, U1RXD_IN_IDX, 0);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_5], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_5, GPIO_PULLUP_ONLY);
-	gpio_set_level(GPIO_NUM_5, 1);
+	gpio_set_level(GPIO_NUM_5, 0);
 	gpio_set_direction(GPIO_NUM_5, GPIO_MODE_OUTPUT);
 	gpio_matrix_out(GPIO_NUM_5, SIG_GPIO_OUT_IDX, 0, 0);
 	config.reserved = UART_HW_FLOWCTRL_DISABLE;
@@ -425,11 +425,11 @@ rt_size_t rt_device_write_485(rt_device_t dev, rt_off_t pos, const void *buffer,
     uint8_t uart_num = uart->num;
 	
 	if (uart_num == 1){
-		gpio_set_level(GPIO_NUM_5, 0);
+		gpio_set_level(GPIO_NUM_5, 1);
 		int ret = rt_device_write(dev, pos, buffer, size);
 		while (UART[uart_num]->status.txfifo_cnt);
 		uart_tx_wait_idle(uart_num);
-		gpio_set_level(GPIO_NUM_5, 1);
+		gpio_set_level(GPIO_NUM_5, 0);
     	return ret;
 	}else{
     	return rt_device_write(dev, pos, buffer, size);
@@ -480,13 +480,13 @@ void rt_hw_i2c_init()
 {
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_4)) rtc_gpio_deinit(GPIO_NUM_4);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_4], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_4, GPIO_FLOATING);
+	gpio_set_pull_mode(GPIO_NUM_4, GPIO_PULLUP_ONLY);
 	gpio_set_level(GPIO_NUM_4, 1);
 	gpio_set_direction(GPIO_NUM_4, GPIO_MODE_INPUT_OUTPUT_OD);
 	gpio_matrix_out(GPIO_NUM_4, SIG_GPIO_OUT_IDX, 0, 0);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_13)) rtc_gpio_deinit(GPIO_NUM_13);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_13], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_13, GPIO_FLOATING);
+	gpio_set_pull_mode(GPIO_NUM_13, GPIO_PULLUP_ONLY);
 	gpio_set_level(GPIO_NUM_13, 1);
 	gpio_set_direction(GPIO_NUM_13, GPIO_MODE_INPUT_OUTPUT_OD);
 	gpio_matrix_out(GPIO_NUM_13, SIG_GPIO_OUT_IDX, 0, 0);
