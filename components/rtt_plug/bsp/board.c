@@ -221,23 +221,17 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
 {
     struct rt_serial_device *serial = (struct rt_serial_device *)param;
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
-    int rx_fifo_len = 0;
     uint8_t uart_num = uart->num;
     uint32_t uart_intr_status = UART[uart_num]->int_st.val;
 
     while(uart_intr_status != 0x0) 
     {
         if((uart_intr_status & UART_RXFIFO_TOUT_INT_ST_M) 
-            || (uart_intr_status & UART_RXFIFO_FULL_INT_ST_M)) {
+            || (uart_intr_status & UART_RXFIFO_FULL_INT_ST_M)
+            || (uart_intr_status & UART_RXFIFO_OVF_INT_ST_M)) {
             rt_hw_serial_isr(serial, RT_SERIAL_EVENT_RX_IND);
             UART[uart_num]->int_clr.rxfifo_tout = 1;
             UART[uart_num]->int_clr.rxfifo_full = 1;
-        } else if(uart_intr_status & UART_RXFIFO_OVF_INT_ST_M) {
-            // Read all data from the FIFO
-            rx_fifo_len = UART[uart_num]->status.rxfifo_cnt;
-            for (int i = 0; i < rx_fifo_len; i++) {
-                READ_PERI_REG(UART_FIFO_REG(uart_num));
-            }
             UART[uart_num]->int_clr.rxfifo_ovf = 1;
         } else if(uart_intr_status & UART_BRK_DET_INT_ST_M) {
             UART[uart_num]->int_clr.brk_det = 1;
@@ -879,13 +873,9 @@ int rt_hw_telnet_init(void)
     return ESP_OK;
 }
 
-volatile int eth_linkstatus = 0;
 volatile int sys_stauts = -1;
-volatile int ppp_linkstatus = 0;
-volatile int wifi_linkstatus = 0;
 volatile int uptime_count = 0;
-
-unsigned char PZ[4] = {0};
+volatile unsigned char PZ[16] = {0};
 char RTT_USER[16] = {"admin"};
 char RTT_PASS[36] = {"21232f297a57a5a743894a0e4a801fc3"};
 char RTT_NTP[32] = {"www.baidu.com"};
@@ -1161,6 +1151,24 @@ void cmd_cpusage(int argc, char **argv)
     rt_kprintf("Cpu Usage: %d.%d%%\n",cpu_usage_major,cpu_usage_minor);
 }
 MSH_CMD_EXPORT_ALIAS(cmd_cpusage, cpusage, cpu usage.)
+
+int cmd_uptime(int argc, char** argv)
+{
+    unsigned updays, uphours, upminutes;
+
+    updays = (unsigned) uptime_count / (unsigned)(120*60*24);
+    if (updays)
+        rt_kprintf("%u day%s, ", updays, (updays != 1) ? "s" : "");
+    upminutes = (unsigned) uptime_count / (unsigned)120;
+    uphours = (upminutes / (unsigned)60) % (unsigned)24;
+    upminutes %= 60;
+    if (uphours)
+        rt_kprintf("%2u:%02u\n", uphours, upminutes);
+    else
+        rt_kprintf("%u min\n", upminutes);
+    return 0;
+}
+MSH_CMD_EXPORT_ALIAS(cmd_uptime, uptime, system up time.)
 
 extern int lua_main (int argc, char **argv);
 MSH_CMD_EXPORT_ALIAS(lua_main, lua, LUA run engine.);

@@ -233,7 +233,7 @@ static int send_packet_http(int sock, char *srv)
 {
     int len = 0, alllen = 0;
     char *find = NULL,*datetime = NULL;
-    static char sendbuf[4096];
+    static char sendbuf[1024];
     struct timeval timeout = {5,0};
     struct timeval tv_set;
     time_t now;

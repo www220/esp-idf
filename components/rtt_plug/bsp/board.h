@@ -41,12 +41,17 @@ void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
 int rt_hw_telnet_init(void);
 
-extern volatile int eth_linkstatus;
+#define PZ_SKIPPRJ      0
+#define PZ_WAIT         1
+#define PZ_NTP          2
+#define PZ_WIFILINK     3
+#define PZ_ETHLINK      4
+#define PZ_APLINK       5
+#define PZ_PPPLINK      6
+
 extern volatile int sys_stauts;
-extern volatile int ppp_linkstatus;
-extern volatile int wifi_linkstatus;
 extern volatile int uptime_count;
-extern unsigned char PZ[4];
+extern volatile unsigned char PZ[16];
 extern char RTT_USER[16];
 extern char RTT_PASS[36];
 extern char RTT_NTP[32];

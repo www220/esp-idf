@@ -60,7 +60,7 @@
 /* Using symbol table */
 #define FINSH_USING_SYMTAB
 #define FINSH_USING_DESCRIPTION
-#define FINSH_THREAD_STACK_SIZE	8192
+#define FINSH_THREAD_STACK_SIZE	4096
 
 /* SECTION: a runtime libc library */
 /* a runtime libc library */
