@@ -175,7 +175,7 @@ struct rt_uart_ops
     rt_size_t (*dma_transmit)(struct rt_serial_device *serial, rt_uint8_t *buf, rt_size_t size, int direction);
 };
 
-void rt_hw_serial_isr(struct rt_serial_device *serial, int event);
+void rt_hw_serial_isr(struct rt_serial_device *serial, int event, int len);
 
 rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
                                const char              *name,

@@ -350,7 +350,7 @@ rt_err_t rt_hw_serial_register(struct rt_serial_device *serial,
 }
 
 /* ISR for serial interrupt */
-void IRAM_ATTR rt_hw_serial_isr(struct rt_serial_device *serial, int event)
+void IRAM_ATTR rt_hw_serial_isr(struct rt_serial_device *serial, int event, int len)
 {
     switch (event & 0xff)
     {
@@ -364,7 +364,7 @@ void IRAM_ATTR rt_hw_serial_isr(struct rt_serial_device *serial, int event)
             rx_fifo = (struct rt_serial_rx_fifo*)serial->serial_rx;
             RT_ASSERT(rx_fifo != RT_NULL);
 
-            while (1)
+            while (len--)
             {
                 ch = serial->ops->getc(serial);
                 if (ch == -1) break;

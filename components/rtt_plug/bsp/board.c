@@ -93,6 +93,7 @@ typedef enum {
 #define UART_INTR_NUM_1           18
 #define UART_INTR_NUM_2           19
 static DRAM_ATTR uart_dev_t* const UART[UART_NUM_MAX] = {&UART0, &UART1, &UART2};
+static void IRAM_ATTR esp32_clr_rxfifo(int uart_num);
 
 struct esp32_uart
 {
@@ -165,8 +166,9 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
         UART[uart_num]->conf0.tx_flow_en = 1;
     else
         UART[uart_num]->conf0.tx_flow_en = 0;
-	//
     UART[uart_num]->idle_conf.tx_idle_num = UART_TX_IDLE_NUM_DEFAULT;
+    //
+    esp32_clr_rxfifo(uart_num);
 	ESP_INTR_DISABLE(uart->irq);
     return RT_EOK;
 }
@@ -179,15 +181,27 @@ static rt_err_t esp32_control(struct rt_serial_device *serial, int cmd, void *ar
     {
     case RT_DEVICE_CTRL_CLR_INT:
         /* disable rx irq */
+        esp32_clr_rxfifo(uart->num);
         ESP_INTR_DISABLE(uart->irq);
         break;
     case RT_DEVICE_CTRL_SET_INT:
         /* enable rx irq */
+        esp32_clr_rxfifo(uart->num);
         ESP_INTR_ENABLE(uart->irq);
         break;
     }
 
     return RT_EOK;
+}
+
+static void IRAM_ATTR esp32_clr_rxfifo(int uart_num)
+{
+    int i = 0,rx_fifo_len = 128;
+    UART[uart_num]->conf0.rxfifo_rst = 1;
+    for (i = 0; i < rx_fifo_len; i++) {
+        READ_PERI_REG(UART_FIFO_REG(uart_num));
+    }
+    UART[uart_num]->conf0.rxfifo_rst = 0;
 }
 
 static int IRAM_ATTR esp32_putc(struct rt_serial_device *serial, char c)
@@ -207,13 +221,7 @@ static int IRAM_ATTR esp32_putc(struct rt_serial_device *serial, char c)
 static int IRAM_ATTR esp32_getc(struct rt_serial_device *serial)
 {
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
-    int uart_num = uart->num;
-
-    int ch = -1;
-    uint8_t rx_fifo_cnt = UART[uart_num]->status.rxfifo_cnt;
-    if (rx_fifo_cnt > 0)
-        ch = UART[uart_num]->fifo.rw_byte;
-    return ch;
+    return (READ_PERI_REG(UART_FIFO_REG(uart->num))) & 0xff;
 }
 
 //internal isr handler for default driver code.
@@ -223,15 +231,21 @@ static void IRAM_ATTR uart_rx_intr_handler_default(void *param)
     struct esp32_uart* uart = (struct esp32_uart *)serial->parent.user_data;
     uint8_t uart_num = uart->num;
     uint32_t uart_intr_status = UART[uart_num]->int_st.val;
+    int rx_fifo_len = 0;
 
     while(uart_intr_status != 0x0) 
     {
         if((uart_intr_status & UART_RXFIFO_TOUT_INT_ST_M) 
-            || (uart_intr_status & UART_RXFIFO_FULL_INT_ST_M)
-            || (uart_intr_status & UART_RXFIFO_OVF_INT_ST_M)) {
-            rt_hw_serial_isr(serial, RT_SERIAL_EVENT_RX_IND);
+            || (uart_intr_status & UART_RXFIFO_FULL_INT_ST_M)) {
+            rx_fifo_len = UART[uart_num]->status.rxfifo_cnt;
+            if (rx_fifo_len <= 0 || rx_fifo_len > 128)
+                esp32_clr_rxfifo(uart_num);
+            else
+                rt_hw_serial_isr(serial, RT_SERIAL_EVENT_RX_IND, rx_fifo_len);
             UART[uart_num]->int_clr.rxfifo_tout = 1;
             UART[uart_num]->int_clr.rxfifo_full = 1;
+        } else if(uart_intr_status & UART_RXFIFO_OVF_INT_ST_M) {
+            esp32_clr_rxfifo(uart_num);
             UART[uart_num]->int_clr.rxfifo_ovf = 1;
         } else if(uart_intr_status & UART_BRK_DET_INT_ST_M) {
             UART[uart_num]->int_clr.brk_det = 1;
@@ -273,15 +287,14 @@ static struct esp32_uart uart2 = { UART_NUM_2, UART_INTR_NUM_2 };
 
 void rt_hw_usart_init() 
 {
-    int rx_fifo_len;
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
 	config.bufsz = 4096;
-	
+	config.reserved = UART_HW_FLOWCTRL_DISABLE;
+
 #ifdef RT_USING_UART0
-	// wait for fifo empty
-	while (UART[uart0.num]->status.txfifo_cnt);
-	uart_tx_wait_idle(0);
-	//
+	periph_module_enable(PERIPH_UART0_MODULE);
+	esp32_clr_rxfifo(uart0.num);
+
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_1)) rtc_gpio_deinit(GPIO_NUM_1);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_3)) rtc_gpio_deinit(GPIO_NUM_3);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_23)) rtc_gpio_deinit(GPIO_NUM_23);
@@ -294,11 +307,10 @@ void rt_hw_usart_init()
 	gpio_set_direction(GPIO_NUM_3, GPIO_MODE_INPUT);
 	gpio_matrix_in(GPIO_NUM_3, U0RXD_IN_IDX, 0);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_23], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_23, GPIO_PULLUP_ONLY);
-	gpio_set_level(GPIO_NUM_23, 1);
-	gpio_set_direction(GPIO_NUM_23, GPIO_MODE_OUTPUT);
+	gpio_set_pull_mode(GPIO_NUM_23, GPIO_FLOATING);
+	gpio_set_level(GPIO_NUM_23, 0);
+	gpio_set_direction(GPIO_NUM_23, GPIO_MODE_OUTPUT_OD);
 	gpio_matrix_out(GPIO_NUM_23, SIG_GPIO_OUT_IDX, 0, 0);
-	config.reserved = UART_HW_FLOWCTRL_DISABLE;
 
 	intr_matrix_set(xPortGetCoreID(), ETS_UART0_INTR_SOURCE, uart0.irq);
 	xt_set_interrupt_handler(uart0.irq, uart_rx_intr_handler_default, &serial0);
@@ -321,10 +333,7 @@ void rt_hw_usart_init()
 #endif
 #ifdef RT_USING_UART2
 	periph_module_enable(PERIPH_UART1_MODULE);
-    rx_fifo_len = UART[uart1.num]->status.rxfifo_cnt;
-    for (int i = 0; i < rx_fifo_len; i++) {
-        READ_PERI_REG(UART_FIFO_REG(uart1.num));
-    }
+	esp32_clr_rxfifo(uart1.num);
 
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_12)) rtc_gpio_deinit(GPIO_NUM_12);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_34)) rtc_gpio_deinit(GPIO_NUM_34);
@@ -342,7 +351,6 @@ void rt_hw_usart_init()
 	gpio_set_level(GPIO_NUM_5, 0);
 	gpio_set_direction(GPIO_NUM_5, GPIO_MODE_OUTPUT);
 	gpio_matrix_out(GPIO_NUM_5, SIG_GPIO_OUT_IDX, 0, 0);
-	config.reserved = UART_HW_FLOWCTRL_DISABLE;
 
     intr_matrix_set(xPortGetCoreID(), ETS_UART1_INTR_SOURCE, uart1.irq);
     xt_set_interrupt_handler(uart1.irq, uart_rx_intr_handler_default, &serial1);
@@ -365,10 +373,7 @@ void rt_hw_usart_init()
 #endif
 #ifdef RT_USING_UART1
 	periph_module_enable(PERIPH_UART2_MODULE);
-    rx_fifo_len = UART[uart2.num]->status.rxfifo_cnt;
-    for (int i = 0; i < rx_fifo_len; i++) {
-        READ_PERI_REG(UART_FIFO_REG(uart2.num));
-    }
+	esp32_clr_rxfifo(uart2.num);
 
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_2)) rtc_gpio_deinit(GPIO_NUM_2);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_18)) rtc_gpio_deinit(GPIO_NUM_18);
@@ -390,7 +395,6 @@ void rt_hw_usart_init()
 	gpio_set_pull_mode(GPIO_NUM_17, GPIO_PULLUP_ONLY);
 	gpio_set_direction(GPIO_NUM_17, GPIO_MODE_INPUT);
 	gpio_matrix_in(GPIO_NUM_17, U2CTS_IN_IDX, 0);
-	config.reserved = UART_HW_FLOWCTRL_DISABLE;
 
     intr_matrix_set(xPortGetCoreID(), ETS_UART2_INTR_SOURCE, uart2.irq);
     xt_set_interrupt_handler(uart2.irq, uart_rx_intr_handler_default, &serial2);
@@ -1123,8 +1127,61 @@ int pin_val(int argc, char **argv)
     return 0;
 }
 
+int uart_test(int argc, char **argv)
+{
+    int i,j;
+    int openflag = 0;
+    int count = 10;
+    char chbuf[100];
+    rt_device_t dev;
+    if (argc < 3)
+    {
+        rt_kprintf("uart_test uart[0,1,2] test");
+        return 1;
+    }
+
+    dev = rt_device_find(argv[1]);
+    if (dev == NULL)
+    {
+        rt_kprintf("%s not find\n", argv[1]);
+        return 0;
+    }
+    if (!(dev->open_flag & RT_DEVICE_OFLAG_OPEN))
+    {
+        rt_device_open(dev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
+        openflag = 1;
+    }
+    if (argc > 3) count = atoi(argv[3]);
+    for (i=0; i<count; i++)
+    {
+        int recvflag = 0;
+        rt_kprintf("send:%s\r\n", argv[2]);
+        rt_device_write_485(dev, 0, argv[2], strlen(argv[2]));
+        rt_kprintf("read:");
+        for (j=0; j<10; j++)
+        {
+            int len = rt_device_read(dev, 0, chbuf, 99);
+            if (len > 0)
+            {
+                chbuf[len] = 0;
+                rt_kprintf(chbuf);
+                recvflag = 1;
+            }
+            rt_thread_delay(100);
+        }
+        rt_kprintf("%s\r\n",(recvflag==0)?"timeout...":"");
+    }
+    if (openflag)
+    {
+        rt_device_close(dev);
+        openflag = 0;
+    }
+    return 0;
+}
+
 MSH_CMD_EXPORT_ALIAS(pin_cfg, pin_cfg, PIN Config.);
 MSH_CMD_EXPORT_ALIAS(pin_val, pin_val, PIN Read.);
+MSH_CMD_EXPORT_ALIAS(uart_test, uart_test, UART Test.);
 
 #include <sys/time.h>
 void cmd_date(int argc, char **argv)

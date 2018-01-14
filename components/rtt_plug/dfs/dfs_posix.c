@@ -317,12 +317,12 @@ void ls(const char *pathname)
 
 int dfs_mkfs(const char *fs_name, const char *device_name)
 {
-	int sub = (fs_name==NULL||!strcasecmp(fs_name,"fat"))?ESP_PARTITION_SUBTYPE_DATA_FAT:ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
+	int sub = (strcasecmp(fs_name,"fat")==0)?ESP_PARTITION_SUBTYPE_DATA_FAT:ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
     const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, sub, device_name);
 	if (part == NULL)
 	{
 		rt_kprintf("No such type %s part %s\n", fs_name, device_name);
-		rt_kprintf("mkfs fat storage or mkfs spiffs syscfg\n", device_name);
+		rt_kprintf("mkfs -t fat storage or mkfs -t spiffs syscfg\n", device_name);
 		return RT_ERROR;
 	}
 	rt_kprintf("part %s begin:%x,size:%x\n", device_name, part->address, part->size);
