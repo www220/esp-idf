@@ -196,12 +196,12 @@ static rt_err_t esp32_control(struct rt_serial_device *serial, int cmd, void *ar
 
 static void IRAM_ATTR esp32_clr_rxfifo(int uart_num)
 {
-    int i = 0,rx_fifo_len = 128;
-    UART[uart_num]->conf0.rxfifo_rst = 1;
-    for (i = 0; i < rx_fifo_len; i++) {
+    // we read the data out and make `fifo_len == 0 && rd_addr == wr_addr`.
+    while(UART[uart_num]->status.rxfifo_cnt != 0 
+        || (UART[uart_num]->mem_rx_status.wr_addr != UART[uart_num]->mem_rx_status.rd_addr))
+    {
         READ_PERI_REG(UART_FIFO_REG(uart_num));
     }
-    UART[uart_num]->conf0.rxfifo_rst = 0;
 }
 
 static int IRAM_ATTR esp32_putc(struct rt_serial_device *serial, char c)
