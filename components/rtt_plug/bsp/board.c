@@ -1136,7 +1136,7 @@ int uart_test(int argc, char **argv)
     rt_device_t dev;
     if (argc < 3)
     {
-        rt_kprintf("uart_test uart[0,1,2] test");
+        rt_kprintf("uart_test uart[0,1,2] test\n");
         return 1;
     }
 
