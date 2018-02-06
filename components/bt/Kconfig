@@ -130,6 +130,16 @@ config A2DP_SRC_ENABLE
     bool "SOURCE"
 endchoice
 
+config A2DP_SINK_TASK_STACK_SIZE
+    int "A2DP sink (audio stream decoding) task stack size"
+    depends on A2DP_ENABLE && A2DP_SINK_ENABLE
+    default 2048
+
+config A2DP_SOURCE_TASK_STACK_SIZE
+    int "A2DP source (audio stream encoding) task stack size"
+    depends on A2DP_ENABLE && A2DP_SRC_ENABLE
+    default 2048
+
 config BT_SPP_ENABLED
     bool "SPP"
     depends on CLASSIC_BT_ENABLED
@@ -172,6 +182,20 @@ config BT_ACL_CONNECTIONS
     default 4
     help 
         Maximum BT/BLE connection count
+
+config BT_ALLOCATION_FROM_SPIRAM_FIRST
+    bool "BT/BLE will first malloc the memory from the PSRAM"
+    depends on BLUEDROID_ENABLED
+    default n
+    help
+        This select can save the internal RAM if there have the PSRAM
+
+config BT_BLE_DYNAMIC_ENV_MEMORY
+    bool "Use dynamic memory allocation in BT/BLE stack"
+    depends on BLUEDROID_ENABLED
+    default n
+    help
+        This select can make the allocation of memory will become more flexible
 
 config SMP_ENABLE
    bool
