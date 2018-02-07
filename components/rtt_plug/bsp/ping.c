@@ -86,7 +86,7 @@ static err_t ping_send(int s, ip4_addr_t *addr, int size)
     to.sin_family = AF_INET;
     to.sin_addr.s_addr = addr->addr;
 
-    err = lwip_sendto(s, iecho, ping_size, 0, (struct sockaddr*)&to, sizeof(to));
+    err = sendto(s, iecho, ping_size, 0, (struct sockaddr*)&to, sizeof(to));
     rt_free(iecho);
 
     return (err ? ERR_OK : ERR_VAL);
@@ -101,7 +101,7 @@ static void ping_recv(int s)
     struct icmp_echo_hdr *iecho;
     struct _ip_addr_t *addr;
 
-    while((len = lwip_recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr*)&from, (socklen_t*)&fromlen)) > 0)
+    while((len = recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr*)&from, (socklen_t*)&fromlen)) > 0)
     {
         if (len >= (sizeof(struct ip_hdr)+sizeof(struct icmp_echo_hdr)))
         {
@@ -149,12 +149,8 @@ rt_err_t ping(int argc, char** argv)
         size = PING_DATA_SIZE;
 
     {
-        char buf[128];
-        int len = sizeof(buf);
-        struct hostent hostinfo;
         struct hostent *host = 0;
-        int hostret = 0;
-        if (gethostbyname_r(target,&hostinfo,buf,len,&host,&hostret) == 0 && host != NULL)
+        if ((host = gethostbyname(target)) != NULL)
         {
             ping_target = *((ip4_addr_t*)host->h_addr);
         }
@@ -166,13 +162,13 @@ rt_err_t ping(int argc, char** argv)
 
     addr = (struct _ip_addr_t*)&ping_target;
 
-    if ((s = lwip_socket(AF_INET, SOCK_RAW, IP_PROTO_ICMP)) < 0)
+    if ((s = socket(AF_INET, SOCK_RAW, IP_PROTO_ICMP)) < 0)
     {
         rt_kprintf("create socket failled\n");
         return -RT_ERROR;
     }
 
-    lwip_setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     while (1)
     {
@@ -192,7 +188,7 @@ rt_err_t ping(int argc, char** argv)
         rt_thread_delay(PING_DELAY); /* take a delay */
     }
 
-    lwip_close(s);
+    closesocket(s);
 
     return RT_EOK;
 }
