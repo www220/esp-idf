@@ -169,7 +169,6 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     UART[uart_num]->idle_conf.tx_idle_num = UART_TX_IDLE_NUM_DEFAULT;
     //
     esp32_clr_rxfifo(uart_num);
-	ESP_INTR_DISABLE(uart->irq);
     return RT_EOK;
 }
 
@@ -288,8 +287,6 @@ static struct esp32_uart uart2 = { UART_NUM_2, UART_INTR_NUM_2 };
 void rt_hw_usart_init() 
 {
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
-	config.bufsz = 4096;
-	config.reserved = UART_HW_FLOWCTRL_DISABLE;
 
 #ifdef RT_USING_UART0
 	periph_module_enable(PERIPH_UART0_MODULE);
