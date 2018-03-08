@@ -48,6 +48,7 @@ int rt_hw_telnet_init(void);
 #define PZ_ETHLINK      4
 #define PZ_APLINK       5
 #define PZ_PPPLINK      6
+#define PZ_LICCHECK     7
 
 extern volatile int sys_stauts;
 extern volatile int uptime_count;

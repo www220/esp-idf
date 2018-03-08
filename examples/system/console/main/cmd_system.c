@@ -94,6 +94,7 @@ static int tasks_info(int argc, char** argv)
         ESP_LOGE(__func__, "failed to allocate buffer for vTaskList output");
         return 1;
     }
+    fputs("Task Name\tStatus\tPrio\tHWM\tTask Number\n", stdout);    
     vTaskList(task_list_buffer);
     fputs(task_list_buffer, stdout);
     free(task_list_buffer);
@@ -154,6 +155,7 @@ static int deep_sleep(int argc, char** argv)
 
         ESP_ERROR_CHECK( esp_sleep_enable_ext1_wakeup(1ULL << io_num, level) );
     }
+    rtc_gpio_isolate(GPIO_NUM_12);
     esp_deep_sleep_start();
 }
 
