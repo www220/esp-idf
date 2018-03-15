@@ -9,6 +9,7 @@
 #include "esp_intr.h"
 #include "esp_log.h"
 #include "rom/uart.h"
+#include "rom/rtc.h"
 #include "soc/uart_reg.h"
 #include "soc/dport_reg.h"
 #include "soc/uart_struct.h"
@@ -1223,6 +1224,17 @@ int cmd_uptime(int argc, char** argv)
     return 0;
 }
 MSH_CMD_EXPORT_ALIAS(cmd_uptime, uptime, system up time.)
+
+int cmd_reset_reason(int argc, char** argv)
+{
+    RESET_REASON rst_reas[2];
+
+    rst_reas[0] = rtc_get_reset_reason(0);
+    rst_reas[1] = rtc_get_reset_reason(1);
+    rt_kprintf("reset reason cpu0:%02x cpu1:%02x\n", rst_reas[0], rst_reas[1]);
+    return 0;
+}
+MSH_CMD_EXPORT_ALIAS(cmd_reset_reason, reset_reason, system reset reason.)
 
 extern int lua_main (int argc, char **argv);
 MSH_CMD_EXPORT_ALIAS(lua_main, lua, LUA run engine.);

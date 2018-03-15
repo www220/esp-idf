@@ -317,7 +317,11 @@ void ls(const char *pathname)
 
 int dfs_mkfs(const char *fs_name, const char *device_name)
 {
-	int sub = (strcasecmp(fs_name,"fat")==0)?ESP_PARTITION_SUBTYPE_DATA_FAT:ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
+	int sub = ESP_PARTITION_SUBTYPE_DATA_COREDUMP;
+    if (strcasecmp(fs_name,"fat")==0)
+        sub = ESP_PARTITION_SUBTYPE_DATA_FAT;
+    else if(strcasecmp(fs_name,"spiffs")==0)
+        sub = ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
     const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, sub, device_name);
 	if (part == NULL)
 	{

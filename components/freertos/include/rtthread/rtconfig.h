@@ -28,6 +28,7 @@
 /* SECTION: RT_DEBUG */
 /* Thread Debug */
 #define RT_DEBUG
+#define rt_thread_free(x) rt_thread_delete(x)
 
 /* Using Dynamic Heap Management */
 #define RT_USING_HEAP
