@@ -1231,7 +1231,7 @@ int cmd_reset_reason(int argc, char** argv)
 
     rst_reas[0] = rtc_get_reset_reason(0);
     rst_reas[1] = rtc_get_reset_reason(1);
-    rt_kprintf("reset reason cpu0:%02x cpu1:%02x\n", rst_reas[0], rst_reas[1]);
+    rt_kprintf("reset reason cpu0:0x%02x cpu1:0x%02x\n", rst_reas[0], rst_reas[1]);
     return 0;
 }
 MSH_CMD_EXPORT_ALIAS(cmd_reset_reason, reset_reason, system reset reason.)
