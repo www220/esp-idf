@@ -322,6 +322,8 @@ int dfs_mkfs(const char *fs_name, const char *device_name)
         sub = ESP_PARTITION_SUBTYPE_DATA_FAT;
     else if(strcasecmp(fs_name,"spiffs")==0)
         sub = ESP_PARTITION_SUBTYPE_DATA_SPIFFS;
+    else if(strcasecmp(fs_name,"ota")==0)
+        sub = ESP_PARTITION_SUBTYPE_DATA_OTA;
     const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, sub, device_name);
 	if (part == NULL)
 	{
