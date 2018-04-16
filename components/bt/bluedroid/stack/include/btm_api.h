@@ -72,6 +72,8 @@ enum {
     BTM_CONTROL_LE_DATA_LEN_UNSUPPORTED,/* 22 controller setting data length is unsupported*/
     BTM_SET_PRIVACY_SUCCESS,            /* 23 enable/disable local privacy success */
     BTM_SET_PRIVACY_FAIL,               /* 24 enable/disable local privacy failed*/
+    BTM_SET_STATIC_RAND_ADDR_FAIL,      /* 25 Command failed */
+    BTM_INVALID_STATIC_RAND_ADDR,       /* 26 invalid static rand addr */
 };
 
 typedef uint8_t tBTM_STATUS;
@@ -181,6 +183,8 @@ typedef UINT8 (tBTM_FILTER_CB) (BD_ADDR bd_addr, DEV_CLASS dc);
 typedef void (tBTM_UPDATE_CONN_PARAM_CBACK) (UINT8 status, BD_ADDR bd_addr, tBTM_LE_UPDATE_CONN_PRAMS *update_conn_params);
 
 typedef void (tBTM_SET_PKT_DATA_LENGTH_CBACK) (UINT8 status, tBTM_LE_SET_PKT_DATA_LENGTH_PARAMS *data_length_params);
+
+typedef void (tBTM_SET_RAND_ADDR_CBACK) (UINT8 status);
 
 typedef void (tBTM_ADD_WHITELIST_CBACK) (UINT8 status, tBTM_WL_OPERATION wl_opration);
 
@@ -3350,7 +3354,7 @@ void BTM_SetSecureConnectionsOnly (BOOLEAN secure_connections_only_mode);
 **
 *******************************************************************************/
 //extern
-BOOLEAN BTM_SetSecurityLevel (BOOLEAN is_originator, char *p_name,
+BOOLEAN BTM_SetSecurityLevel (BOOLEAN is_originator, const char *p_name,
                               UINT8 service_id, UINT16 sec_level,
                               UINT16 psm, UINT32 mx_proto_id,
                               UINT32 mx_chan_id);

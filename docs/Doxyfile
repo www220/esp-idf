@@ -28,6 +28,8 @@ INPUT = \
     ../../components/esp32/include/esp_wifi_types.h \
     ../../components/esp32/include/esp_smartconfig.h \
     ../../components/esp32/include/esp_now.h \
+    ## Mesh - API Reference
+    ../../components/esp32/include/esp_mesh.h \
     ## Bluetooth - API Reference
     ## Controller && VHCI
     ../../components/bt/include/bt.h \
@@ -85,6 +87,9 @@ INPUT = \
     ##
     ## Protocols - API Reference
     ##
+    ## ESP-TLS
+    ../../components/esp-tls/esp_tls.h \
+    ## mDNS    
     ../../components/mdns/include/mdns.h \
     ##
     ## Storage - API Reference
@@ -96,7 +101,6 @@ INPUT = \
     ## SPIFFS
     ../../components/spiffs/include/esp_spiffs.h \
     ## SD/MMC Card Host
-    ## NOTE: for three lines below header_file.inc is not used
     ../../components/sdmmc/include/sdmmc_cmd.h \
     ../../components/driver/include/driver/sdmmc_host.h \
     ../../components/driver/include/driver/sdmmc_types.h \

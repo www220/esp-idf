@@ -45,6 +45,9 @@ help:
 	@echo "See also 'make bootloader', 'make bootloader-flash', 'make bootloader-clean', "
 	@echo "'make partition_table', etc, etc."
 
+# Non-interactive targets. Mostly, those for which you do not need to build a binary
+NON_INTERACTIVE_TARGET += defconfig clean% %clean help list-components print_flash_cmd
+
 # dependency checks
 ifndef MAKE_RESTARTS
 ifeq ("$(filter 4.% 3.81 3.82,$(MAKE_VERSION))","")
@@ -146,6 +149,10 @@ COMPONENTS := $(dir $(foreach cd,$(COMPONENT_DIRS),                           \
 					$(wildcard $(cd)/*/component.mk) $(wildcard $(cd)/component.mk) \
 				))
 COMPONENTS := $(sort $(foreach comp,$(COMPONENTS),$(lastword $(subst /, ,$(comp)))))
+endif
+# After a full manifest of component names is determined, subtract the ones explicitly omitted by the project Makefile.
+ifdef EXCLUDE_COMPONENTS
+COMPONENTS := $(filter-out $(EXCLUDE_COMPONENTS), $(COMPONENTS))
 endif
 export COMPONENTS
 
@@ -259,6 +266,10 @@ COMMON_WARNING_FLAGS = -Wall -Werror=all \
 	-Wno-error=deprecated-declarations \
 	-Wextra \
 	-Wno-unused-parameter -Wno-sign-compare
+
+ifdef CONFIG_WARN_WRITE_STRINGS
+COMMON_WARNING_FLAGS += -Wwrite-strings
+endif #CONFIG_WARN_WRITE_STRINGS
 
 # Flags which control code generation and dependency generation, both for C and C++
 COMMON_FLAGS = \
@@ -508,6 +519,9 @@ list-components:
 	$(info $(call dequote,$(SEPARATOR)))
 	$(info COMPONENTS (list of component names))
 	$(info $(COMPONENTS))
+	$(info $(call dequote,$(SEPARATOR)))
+	$(info EXCLUDE_COMPONENTS (list of excluded names))
+	$(info $(if $(EXCLUDE_COMPONENTS),$(EXCLUDE_COMPONENTS),(none provided)))	
 	$(info $(call dequote,$(SEPARATOR)))
 	$(info COMPONENT_PATHS (paths to all components):)
 	$(foreach cp,$(COMPONENT_PATHS),$(info $(cp)))

@@ -195,6 +195,21 @@ esp_err_t esp_ble_gap_config_local_privacy (bool privacy_enable)
     return (btc_transfer_context(&msg, &arg, sizeof(btc_ble_gap_args_t), NULL) == BT_STATUS_SUCCESS ? ESP_OK : ESP_FAIL);
 }
 
+esp_err_t esp_ble_gap_config_local_icon (uint16_t icon)
+{
+    btc_msg_t msg;
+    btc_ble_gap_args_t arg;
+
+    ESP_BLUEDROID_STATUS_CHECK(ESP_BLUEDROID_STATUS_ENABLED);
+
+    msg.sig = BTC_SIG_API_CALL;
+    msg.pid = BTC_PID_GAP_BLE;
+    msg.act = BTC_GAP_BLE_ACT_CONFIG_LOCAL_ICON;
+    arg.cfg_local_icon.icon = icon;
+
+    return (btc_transfer_context(&msg, &arg, sizeof(btc_ble_gap_args_t), NULL) == BT_STATUS_SUCCESS ? ESP_OK : ESP_FAIL);
+}
+
 esp_err_t esp_ble_gap_update_whitelist(bool add_remove, esp_bd_addr_t remote_bda)
 {
     btc_msg_t msg;
@@ -266,6 +281,18 @@ esp_err_t esp_ble_gap_set_device_name(const char *name)
     ESP_BLUEDROID_STATUS_CHECK(ESP_BLUEDROID_STATUS_ENABLED);
 
     return esp_bt_dev_set_device_name(name);
+}
+
+esp_err_t esp_ble_gap_get_local_used_addr(esp_bd_addr_t local_used_addr, uint8_t * addr_type)
+{
+    if(esp_bluedroid_get_status() != (ESP_BLUEDROID_STATUS_ENABLED)) {
+        LOG_ERROR("%s, bluedroid status error", __func__);
+        return ESP_FAIL;
+    } 
+    if(!BTM_BleGetCurrentAddress(local_used_addr, addr_type)) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
 }
 
 uint8_t *esp_ble_resolve_adv_data( uint8_t *adv_data, uint8_t type, uint8_t *length)
