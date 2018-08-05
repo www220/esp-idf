@@ -6,6 +6,8 @@ API Guides
 
    General Notes <general-notes>
    Build System <build-system>
+   Error Handling <error-handling>
+   Fatal Errors <fatal-errors>
    Deep Sleep Wake Stubs <deep-sleep-stub>
    ESP32 Core Dump <core_dump>
    Flash Encryption <../security/flash-encryption>
@@ -13,6 +15,7 @@ API Guides
    Thread Local Storage <thread-local-storage>
    High Level Interrupts <hlinterrupts>
    JTAG Debugging <jtag-debugging/index>
+   Bootloader <bootloader>
    Partition Tables <partition-tables>
    Secure Boot <../security/secure-boot>
    ULP Coprocessor <ulp>
@@ -22,4 +25,5 @@ API Guides
    ROM debug console <romconsole>
    WiFi Driver <wifi>
    Mesh Stack <mesh>
+   BluFi <blufi>
    External SPI-connected RAM <external-ram>

@@ -38,8 +38,6 @@
 #include "freertos/queue.h"
 #include "freertos/portmacro.h"
 
-#include "tcpip_adapter.h"
-
 #include "esp_heap_caps_init.h"
 #include "sdkconfig.h"
 #include "esp_system.h"
@@ -55,6 +53,7 @@
 #include "esp_newlib.h"
 #include "esp_brownout.h"
 #include "esp_int_wdt.h"
+#include "esp_task.h"
 #include "esp_task_wdt.h"
 #include "esp_phy_init.h"
 #include "esp_cache_err_int.h"
@@ -62,6 +61,7 @@
 #include "esp_panic.h"
 #include "esp_core_dump.h"
 #include "esp_app_trace.h"
+#include "esp_dbg_stubs.h"
 #include "esp_efuse.h"
 #include "esp_spiram.h"
 #include "esp_clk_internal.h"
@@ -337,6 +337,9 @@ void start_cpu0_default(void)
 #endif
 #if CONFIG_SYSVIEW_ENABLE
     SEGGER_SYSVIEW_Conf();
+#endif
+#if CONFIG_ESP32_DEBUG_STUBS_ENABLE
+    esp_dbg_stubs_init();
 #endif
     err = esp_pthread_init();
     assert(err == ESP_OK && "Failed to init pthread module!");

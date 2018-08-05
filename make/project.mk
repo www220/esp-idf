@@ -10,7 +10,7 @@
 # where this file is located.
 #
 
-.PHONY: build-components menuconfig defconfig all build clean all_binaries check-submodules size size-components size-files list-components
+.PHONY: build-components menuconfig defconfig all build clean all_binaries check-submodules size size-components size-files size-symbols list-components
 
 MAKECMDGOALS ?= all
 all: all_binaries
@@ -32,7 +32,9 @@ help:
 	@echo "make clean - Remove all build output"
 	@echo "make size - Display the static memory footprint of the app"
 	@echo "make size-components, size-files - Finer-grained memory footprints"
+	@echo "make size-symbols - Per symbol memory footprint. Requires COMPONENT=<component>"
 	@echo "make erase_flash - Erase entire flash contents"
+	@echo "make erase_ota - Erase ota_data partition. After that will boot first bootable partition (factory or OTAx)."
 	@echo "make monitor - Run idf_monitor tool to monitor serial output from app"
 	@echo "make simple_monitor - Monitor serial output on terminal console"
 	@echo "make list-components - List all components in the project"
@@ -152,7 +154,8 @@ COMPONENTS := $(sort $(foreach comp,$(COMPONENTS),$(lastword $(subst /, ,$(comp)
 endif
 # After a full manifest of component names is determined, subtract the ones explicitly omitted by the project Makefile.
 ifdef EXCLUDE_COMPONENTS
-COMPONENTS := $(filter-out $(EXCLUDE_COMPONENTS), $(COMPONENTS))
+COMPONENTS := $(filter-out $(subst ",,$(EXCLUDE_COMPONENTS)), $(COMPONENTS)) 
+# to keep syntax highlighters happy: "))
 endif
 export COMPONENTS
 
@@ -166,12 +169,13 @@ COMPONENT_PATHS := $(foreach comp,$(COMPONENTS),$(firstword $(foreach cd,$(COMPO
 export COMPONENT_PATHS
 
 TEST_COMPONENTS ?=
+TEST_EXCLUDE_COMPONENTS ?=
 TESTS_ALL ?=
 
 # If TESTS_ALL set to 1, set TEST_COMPONENTS_LIST to all components.
 # Otherwise, use the list supplied in TEST_COMPONENTS.
 ifeq ($(TESTS_ALL),1)
-TEST_COMPONENTS_LIST := $(COMPONENTS)
+TEST_COMPONENTS_LIST := $(filter-out $(TEST_EXCLUDE_COMPONENTS), $(COMPONENTS))
 else
 TEST_COMPONENTS_LIST := $(TEST_COMPONENTS)
 endif
@@ -227,7 +231,12 @@ endif
 	@echo $(ESPTOOLPY_WRITE_FLASH) $(ESPTOOL_ALL_FLASH_ARGS)
 
 
+# If we have `version.txt` then prefer that for extracting IDF version
+ifeq ("$(wildcard ${IDF_PATH}/version.txt)","")
 IDF_VER := $(shell cd ${IDF_PATH} && git describe --always --tags --dirty)
+else
+IDF_VER := `cat ${IDF_PATH}/version.txt`
+endif
 
 # Set default LDFLAGS
 EXTRA_LDFLAGS ?=
@@ -337,7 +346,9 @@ else
 CXXFLAGS += -fno-exceptions
 endif
 
-export CFLAGS CPPFLAGS CXXFLAGS
+ARFLAGS := cru
+
+export CFLAGS CPPFLAGS CXXFLAGS ARFLAGS
 
 # Set default values that were not previously defined
 CC ?= gcc
@@ -374,7 +385,7 @@ APP_BIN:=$(APP_ELF:.elf=.bin)
 # Include any Makefile.projbuild file letting components add
 # configuration at the project level
 define includeProjBuildMakefile
-$(if $(V),$(info including $(1)/Makefile.projbuild...))
+$(if $(V),$$(info including $(1)/Makefile.projbuild...))
 COMPONENT_PATH := $(1)
 include $(1)/Makefile.projbuild
 endef
@@ -399,15 +410,15 @@ $(APP_ELF): $(foreach libcomp,$(COMPONENT_LIBRARIES),$(BUILD_DIR_BASE)/$(libcomp
 	$(summary) LD $(patsubst $(PWD)/%,%,$@)
 	$(CC) $(LDFLAGS) -o $@ -Wl,-Map=$(APP_MAP)
 
-app: $(APP_BIN)
+app: $(APP_BIN) partition_table_get_info
 ifeq ("$(CONFIG_SECURE_BOOT_ENABLED)$(CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES)","y") # secure boot enabled, but remote sign app image
 	@echo "App built but not signed. Signing step via espsecure.py:"
 	@echo "espsecure.py sign_data --keyfile KEYFILE $(APP_BIN)"
 	@echo "Then flash app command is:"
-	@echo $(ESPTOOLPY_WRITE_FLASH) $(CONFIG_APP_OFFSET) $(APP_BIN)
+	@echo $(ESPTOOLPY_WRITE_FLASH) $(APP_OFFSET) $(APP_BIN)
 else
 	@echo "App built. Default flash app command is:"
-	@echo $(ESPTOOLPY_WRITE_FLASH) $(CONFIG_APP_OFFSET) $(APP_BIN)
+	@echo $(ESPTOOLPY_WRITE_FLASH) $(APP_OFFSET) $(APP_BIN)
 endif
 
 all_binaries: $(APP_BIN)
@@ -474,6 +485,13 @@ size-files: $(APP_ELF)
 size-components: $(APP_ELF)
 	$(PYTHON) $(IDF_PATH)/tools/idf_size.py --archives $(APP_MAP)
 
+size-symbols: $(APP_ELF)
+ifndef COMPONENT
+	$(error "ERROR: Please enter the component to look symbols for, e.g. COMPONENT=heap")
+else
+	$(PYTHON) $(IDF_PATH)/tools/idf_size.py --archive_details lib$(COMPONENT).a $(APP_MAP)
+endif
+
 # NB: this ordering is deliberate (app-clean & bootloader-clean before
 # _config-clean), so config remains valid during all component clean
 # targets
@@ -485,6 +503,8 @@ clean: app-clean bootloader-clean config-clean
 #
 # This only works for components inside IDF_PATH
 check-submodules:
+# Check if .gitmodules exists, otherwise skip submodule check, assuming flattened structure
+ifneq ("$(wildcard ${IDF_PATH}/.gitmodules)","")
 
 # Dump the git status for the whole working copy once, then grep it for each submodule. This saves a lot of time on Windows.
 GIT_STATUS := $(shell cd ${IDF_PATH} && git status --porcelain --ignore-submodules=dirty)
@@ -496,7 +516,7 @@ check-submodules: $(IDF_PATH)/$(1)/.git
 $(IDF_PATH)/$(1)/.git:
 	@echo "WARNING: Missing submodule $(1)..."
 	[ -e ${IDF_PATH}/.git ] || ( echo "ERROR: esp-idf must be cloned from git to work."; exit 1)
-	[ -x $$(which git) ] || ( echo "ERROR: Need to run 'git submodule init $(1)' in esp-idf root directory."; exit 1)
+	[ -x "$(shell which git)" ] || ( echo "ERROR: Need to run 'git submodule init $(1)' in esp-idf root directory."; exit 1)
 	@echo "Attempting 'git submodule update --init $(1)' in esp-idf root directory..."
 	cd ${IDF_PATH} && git submodule update --init $(1)
 
@@ -509,6 +529,7 @@ endef
 # filter/subst in expression ensures all submodule paths begin with $(IDF_PATH), and then strips that prefix
 # so the argument is suitable for use with 'git submodule' commands
 $(foreach submodule,$(subst $(IDF_PATH)/,,$(filter $(IDF_PATH)/%,$(COMPONENT_SUBMODULES))),$(eval $(call GenerateSubmoduleCheckTarget,$(submodule))))
+endif # End check for .gitmodules existence
 
 
 # PHONY target to list components in the build and their paths
@@ -517,17 +538,17 @@ list-components:
 	$(info COMPONENT_DIRS (components searched for here))
 	$(foreach cd,$(COMPONENT_DIRS),$(info $(cd)))
 	$(info $(call dequote,$(SEPARATOR)))
-	$(info COMPONENTS (list of component names))
-	$(info $(COMPONENTS))
+	$(info TEST_COMPONENTS (list of test component names))
+	$(info $(TEST_COMPONENTS_LIST))
 	$(info $(call dequote,$(SEPARATOR)))
-	$(info EXCLUDE_COMPONENTS (list of excluded names))
-	$(info $(if $(EXCLUDE_COMPONENTS),$(EXCLUDE_COMPONENTS),(none provided)))	
+	$(info TEST_EXCLUDE_COMPONENTS (list of test excluded names))
+	$(info $(if $(EXCLUDE_COMPONENTS) || $(TEST_EXCLUDE_COMPONENTS),$(EXCLUDE_COMPONENTS) $(TEST_EXCLUDE_COMPONENTS),(none provided)))	
 	$(info $(call dequote,$(SEPARATOR)))
 	$(info COMPONENT_PATHS (paths to all components):)
 	$(foreach cp,$(COMPONENT_PATHS),$(info $(cp)))
 
 # print flash command, so users can dump this to config files and download somewhere without idf
-print_flash_cmd:
+print_flash_cmd: partition_table_get_info blank_ota_data
 	echo $(ESPTOOL_WRITE_FLASH_OPTIONS) $(ESPTOOL_ALL_FLASH_ARGS) | sed -e 's:'$(PWD)/build/'::g'
 
 # Check toolchain version using the output of xtensa-esp32-elf-gcc --version command.

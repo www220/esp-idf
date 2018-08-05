@@ -17,10 +17,10 @@
  ******************************************************************************/
 
 #include <string.h>
-#include "interop.h"
-#include "bt_target.h"
+#include "device/interop.h"
+#include "common/bt_target.h"
 #include "btm_int.h"
-#include "l2c_api.h"
+#include "stack/l2c_api.h"
 #include "smp_int.h"
 //#include "utils/include/bt_utils.h"
 
@@ -58,7 +58,7 @@ static bool lmp_version_below(BD_ADDR bda, uint8_t version)
         SMP_TRACE_WARNING("%s cannot retrieve LMP version...", __func__);
         return false;
     }
-    SMP_TRACE_WARNING("%s LMP version %d < %d", __func__, acl->lmp_version, version);
+    SMP_TRACE_DEBUG("%s LMP version %d < %d", __func__, acl->lmp_version, version);
     return acl->lmp_version < version;
 }
 

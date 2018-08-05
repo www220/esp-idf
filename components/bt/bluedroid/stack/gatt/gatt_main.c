@@ -22,15 +22,15 @@
  *
  ******************************************************************************/
 
-#include "bt_target.h"
+#include "common/bt_target.h"
 
 #if BLE_INCLUDED == TRUE
 
 #include "gatt_int.h"
-#include "l2c_api.h"
+#include "stack/l2c_api.h"
 #include "btm_int.h"
 #include "btm_ble_int.h"
-#include "allocator.h"
+#include "osi/allocator.h"
 
 /* Configuration flags. */
 #define GATT_L2C_CFG_IND_DONE   (1<<0)
@@ -179,7 +179,7 @@ void gatt_free(void)
 
         btu_free_timer(&gatt_cb.tcb[i].ind_ack_timer_ent);
         memset(&gatt_cb.tcb[i].ind_ack_timer_ent, 0, sizeof(TIMER_LIST_ENT));
-    
+
 #if (GATTS_INCLUDED == TRUE)
         fixed_queue_free(gatt_cb.tcb[i].sr_cmd.multi_rsp_q, NULL);
         gatt_cb.tcb[i].sr_cmd.multi_rsp_q = NULL;
@@ -979,7 +979,12 @@ void gatt_data_process (tGATT_TCB *p_tcb, BT_HDR *p_buf)
                 }
             }
         } else {
-            GATT_TRACE_ERROR ("ATT - Rcvd L2CAP data, unknown cmd: 0x%x\n", op_code);
+            if (op_code & GATT_COMMAND_FLAG) {
+                GATT_TRACE_ERROR ("ATT - Rcvd L2CAP data, unknown cmd: 0x%x\n", op_code);
+            } else {
+                GATT_TRACE_ERROR ("ATT - Rcvd L2CAP data, unknown req: 0x%x\n", op_code);
+                gatt_send_error_rsp (p_tcb, GATT_REQ_NOT_SUPPORTED, op_code, 0, FALSE);
+            }
         }
     } else {
         GATT_TRACE_ERROR ("invalid data length, ignore\n");

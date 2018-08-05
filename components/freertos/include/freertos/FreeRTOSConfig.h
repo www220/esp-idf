@@ -211,6 +211,10 @@ int xt_clock_freq(void) __attribute__((deprecated));
 #define configUSE_STATS_FORMATTING_FUNCTIONS    1   /* Used by vTaskList() */
 #endif
 
+#ifdef CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID
+#define configTASKLIST_INCLUDE_COREID   1
+#endif
+
 #ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
 #define configGENERATE_RUN_TIME_STATS   1       /* Used by vTaskGetRunTimeStats() */
 #endif
@@ -289,6 +293,10 @@ extern void vPortCleanUpTCB ( void *pxTCB );
 #define INCLUDE_eTaskGetState               1
 #define configUSE_QUEUE_SETS                1
 
+#define configUSE_TICKLESS_IDLE             CONFIG_FREERTOS_USE_TICKLESS_IDLE
+#if configUSE_TICKLESS_IDLE
+#define configEXPECTED_IDLE_TIME_BEFORE_SLEEP   CONFIG_FREERTOS_IDLE_TIME_BEFORE_SLEEP
+#endif //configUSE_TICKLESS_IDLE
 
 #define configXT_BOARD                      1   /* Board mode */
 #define configXT_SIMULATOR					0

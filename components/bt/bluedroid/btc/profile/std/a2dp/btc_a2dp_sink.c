@@ -17,30 +17,30 @@
  **  Name:          btc_a2dp_sink.c
  **
  ******************************************************************************/
-#include "bt_target.h"
-#include "bt_trace.h"
+#include "common/bt_target.h"
+#include "common/bt_trace.h"
 #include <string.h>
 #include <stdint.h>
-#include "bt_defs.h"
-#include "allocator.h"
-#include "mutex.h"
-#include "thread.h"
-#include "fixed_queue.h"
-#include "a2d_api.h"
-#include "a2d_sbc.h"
-#include "bta_av_api.h"
-#include "bta_av_ci.h"
+#include "common/bt_defs.h"
+#include "osi/allocator.h"
+#include "osi/mutex.h"
+#include "osi/thread.h"
+#include "osi/fixed_queue.h"
+#include "stack/a2d_api.h"
+#include "stack/a2d_sbc.h"
+#include "bta/bta_av_api.h"
+#include "bta/bta_av_ci.h"
 #include "btc_av_co.h"
 #include "btc_a2dp.h"
 #include "btc_a2dp_control.h"
 #include "btc_a2dp_sink.h"
-#include "btc_manage.h"
+#include "btc/btc_manage.h"
 #include "btc_av.h"
-#include "btc_util.h"
+#include "btc/btc_util.h"
 #include "esp_a2dp_api.h"
 #include "oi_codec_sbc.h"
 #include "oi_status.h"
-#include "future.h"
+#include "osi/future.h"
 #include <assert.h>
 
 #if (BTC_AV_SINK_INCLUDED == TRUE)
@@ -87,8 +87,8 @@ enum {
    but due to link flow control or thread preemption in lower
    layers we might need to temporarily buffer up data */
 
-/* 5 frames is equivalent to 6.89*5*2.9 ~= 100 ms @ 44.1 khz, 20 ms mediatick */
-#define MAX_OUTPUT_A2DP_SNK_FRAME_QUEUE_SZ     (5)
+/* 18 frames is equivalent to 6.89*18*2.9 ~= 360 ms @ 44.1 khz, 20 ms mediatick */
+#define MAX_OUTPUT_A2DP_SNK_FRAME_QUEUE_SZ     (18)
 
 typedef struct {
     UINT16 num_frames_to_be_processed;
@@ -588,6 +588,7 @@ static void btc_a2dp_sink_handle_inc_media(tBT_SBC_HDR *p_msg)
     UINT32 sbc_frame_len = p_msg->len - 1;
     availPcmBytes = 2 * sizeof(pcmData);
 
+    /* XXX: Check if the below check is correct, we are checking for peer to be sink when we are sink */
     if (btc_av_get_peer_sep() == AVDT_TSEP_SNK || (btc_aa_snk_cb.rx_flush)) {
         APPL_TRACE_DEBUG(" State Changed happened in this tick ");
         return;

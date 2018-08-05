@@ -446,8 +446,6 @@ typedef struct fd_set
   unsigned char fd_bits [(FD_SETSIZE+7)/8];
 } fd_set;
 
-#elif LWIP_SOCKET_OFFSET
-#error LWIP_SOCKET_OFFSET does not work with external FD_SET!
 #endif /* FD_SET */
 
 /** LWIP_TIMEVAL_PRIVATE: if you want to use the struct timeval provided
@@ -532,7 +530,6 @@ int lwip_fcntl(int s, int cmd, int val);
 #if LWIP_COMPAT_SOCKETS != 2
 
 #if ESP_THREAD_SAFE
-
 int lwip_accept_r(int s, struct sockaddr *addr, socklen_t *addrlen);
 int lwip_bind_r(int s, const struct sockaddr *name, socklen_t namelen);
 int lwip_shutdown_r(int s, int how);
@@ -543,6 +540,7 @@ int lwip_setsockopt_r (int s, int level, int optname, const void *optval, sockle
 int lwip_close_r(int s);
 int lwip_connect_r(int s, const struct sockaddr *name, socklen_t namelen);
 int lwip_listen_r(int s, int backlog);
+int lwip_recvmsg_r(int s, struct msghdr *message, int flags);
 int lwip_recv_r(int s, void *mem, size_t len, int flags);
 int lwip_read_r(int s, void *mem, size_t len); 
 int lwip_recvfrom_r(int s, void *mem, size_t len, int flags,
@@ -579,6 +577,8 @@ static inline int connect(int s,const struct sockaddr *name,socklen_t namelen)
 { return lwip_connect_r(s,name,namelen); }
 static inline int listen(int s,int backlog)
 { return lwip_listen_r(s,backlog); }
+static inline int recvmsg(int sockfd, struct msghdr *msg, int flags)
+{ return lwip_recvmsg_r(sockfd, msg, flags); }
 static inline int recv(int s,void *mem,size_t len,int flags)
 { return lwip_recv_r(s,mem,len,flags); }
 static inline int recvfrom(int s,void *mem,size_t len,int flags,struct sockaddr *from,socklen_t *fromlen)
@@ -591,8 +591,10 @@ static inline int sendto(int s,const void *dataptr,size_t size,int flags,const s
 { return lwip_sendto_r(s,dataptr,size,flags,to,tolen); }
 static inline int socket(int domain,int type,int protocol)
 { return lwip_socket(domain,type,protocol); }
+#ifndef ESP_HAS_SELECT
 static inline int select(int maxfdp1,fd_set *readset,fd_set *writeset,fd_set *exceptset,struct timeval *timeout)
 { return lwip_select(maxfdp1,readset,writeset,exceptset,timeout); }
+#endif /* ESP_HAS_SELECT */
 static inline int ioctlsocket(int s,long cmd,void *argp)
 { return lwip_ioctl_r(s,cmd,argp); }
 
@@ -633,6 +635,8 @@ static inline int connect(int s,const struct sockaddr *name,socklen_t namelen)
 { return lwip_connect(s,name,namelen); }
 static inline int listen(int s,int backlog)
 { return lwip_listen(s,backlog); }
+static inline int recvmsg(int sockfd, struct msghdr *msg, int flags)
+{ return lwip_recvmsg(sockfd, msg, flags); }
 static inline int recv(int s,void *mem,size_t len,int flags)
 { return lwip_recv(s,mem,len,flags); }
 static inline int recvfrom(int s,void *mem,size_t len,int flags,struct sockaddr *from,socklen_t *fromlen)
@@ -645,8 +649,10 @@ static inline int sendto(int s,const void *dataptr,size_t size,int flags,const s
 { return lwip_sendto(s,dataptr,size,flags,to,tolen); }
 static inline int socket(int domain,int type,int protocol)
 { return lwip_socket(domain,type,protocol); }
+#ifndef ESP_HAS_SELECT
 static inline int select(int maxfdp1,fd_set t*readset,fd_set *writeset,fd_set *exceptset,struct timeval *timeout)
 { return lwip_select(maxfdp1,readset,writeset,exceptset,timeout); }
+#endif /* ESP_HAS_SELECT */
 static inline int ioctlsocket(int s,long cmd,void *argp)
 { return lwip_ioctl(s,cmd,argp); }
 
@@ -669,23 +675,36 @@ static inline int ioctl(int s,int cmd,int argp)
 #endif /* LWIP_COMPAT_SOCKETS != 2 */
 
 #if LWIP_IPV4 && LWIP_IPV6
-#define inet_ntop(af,src,dst,size) \
+#define lwip_inet_ntop(af,src,dst,size) \
     (((af) == AF_INET6) ? ip6addr_ntoa_r((const ip6_addr_t*)(src),(dst),(size)) \
      : (((af) == AF_INET) ? ip4addr_ntoa_r((const ip4_addr_t*)(src),(dst),(size)) : NULL))
-#define inet_pton(af,src,dst) \
+#define lwip_inet_pton(af,src,dst) \
     (((af) == AF_INET6) ? ip6addr_aton((src),(ip6_addr_t*)(dst)) \
      : (((af) == AF_INET) ? ip4addr_aton((src),(ip4_addr_t*)(dst)) : 0))
 #elif LWIP_IPV4 /* LWIP_IPV4 && LWIP_IPV6 */
-#define inet_ntop(af,src,dst,size) \
+#define lwip_inet_ntop(af,src,dst,size) \
     (((af) == AF_INET) ? ip4addr_ntoa_r((const ip4_addr_t*)(src),(dst),(size)) : NULL)
-#define inet_pton(af,src,dst) \
+#define lwip_inet_pton(af,src,dst) \
     (((af) == AF_INET) ? ip4addr_aton((src),(ip4_addr_t*)(dst)) : 0)
 #else /* LWIP_IPV4 && LWIP_IPV6 */
-#define inet_ntop(af,src,dst,size) \
+#define lwip_inet_ntop(af,src,dst,size) \
     (((af) == AF_INET6) ? ip6addr_ntoa_r((const ip6_addr_t*)(src),(dst),(size)) : NULL)
-#define inet_pton(af,src,dst) \
+#define lwip_inet_pton(af,src,dst) \
     (((af) == AF_INET6) ? ip6addr_aton((src),(ip6_addr_t*)(dst)) : 0)
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
+
+#if LWIP_COMPAT_SOCKET_INET == 1
+/* Some libraries have problems with inet_... being macros, so please use this define 
+    to declare normal functions */
+static inline const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{ lwip_inet_ntop(af, src, dst, size);    return dst; }
+static inline int inet_pton(int af, const char *src, void *dst)
+{ lwip_inet_pton(af, src, dst); return 1; }   
+#else
+/* By default fall back to original inet_... macros */
+# define inet_ntop(a,b,c,d) lwip_inet_ntop(a,b,c,d) 
+# define inet_pton(a,b,c)   lwip_inet_pton(a,b,c)   
+#endif /* LWIP_COMPAT_SOCKET_INET */
 
 #endif /* LWIP_COMPAT_SOCKETS */
 

@@ -22,14 +22,14 @@
  *
  ******************************************************************************/
 
-#include "bt_target.h"
+#include "common/bt_target.h"
 
 #if (GATTC_INCLUDED == TRUE && BLE_INCLUDED == TRUE)
 
 #include <string.h>
 
 #include "bta_gattc_int.h"
-#include "allocator.h"
+#include "osi/allocator.h"
 
 
 /*****************************************************************************
@@ -356,7 +356,12 @@ BOOLEAN bta_gattc_hdl_event(BT_HDR *p_msg)
     case BTA_GATTC_API_REFRESH_EVT:
         bta_gattc_process_api_refresh(p_cb, (tBTA_GATTC_DATA *) p_msg);
         break;
-
+    case BTA_GATTC_API_CACHE_ASSOC_EVT:
+        bta_gattc_process_api_cache_assoc(p_cb, (tBTA_GATTC_DATA *)p_msg);
+        break;
+    case BTA_GATTC_API_CACHE_GET_ADDR_LIST_EVT:
+        bta_gattc_process_api_cache_get_addr_list(p_cb, (tBTA_GATTC_DATA *)p_msg);
+        break;
 #if BLE_INCLUDED == TRUE
     case BTA_GATTC_API_LISTEN_EVT:
         bta_gattc_listen(p_cb, (tBTA_GATTC_DATA *) p_msg);

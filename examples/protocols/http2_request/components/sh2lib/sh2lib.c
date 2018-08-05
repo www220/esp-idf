@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <esp_log.h>
+#include <http_parser.h>
 
 #include "sh2lib.h"
 
@@ -57,22 +58,19 @@ static ssize_t callback_send(nghttp2_session *session, const uint8_t *data,
     int pending_data = length;
 
     /* Send data in 1000 byte chunks */
-    while (copy_offset != (length - 1)) {
+    while (copy_offset != length) {
         int chunk_len = pending_data > 1000 ? 1000 : pending_data;
         int subrv = callback_send_inner(hd, data + copy_offset, chunk_len);
         if (subrv <= 0) {
-            if (copy_offset) {
-                /* If some data was xferred, send the number of bytes
-                 * xferred */
-                rv = copy_offset;
-            } else {
-                /* If not, send the error code */
+            if (copy_offset == 0) {
+                /* If no data is transferred, send the error code */
                 rv = subrv;
             }
             break;
         }
-        copy_offset += chunk_len;
-        pending_data -= chunk_len;
+        copy_offset += subrv;
+        pending_data -= subrv;
+        rv += subrv;
     }
     return rv;
 }
@@ -240,14 +238,19 @@ static int do_http2_connect(struct sh2lib_handle *hd)
 int sh2lib_connect(struct sh2lib_handle *hd, const char *uri)
 {
     memset(hd, 0, sizeof(*hd));
+    const char *proto[] = {"h2", NULL};
     esp_tls_cfg_t tls_cfg = {
-        .alpn_protos = (unsigned char *) "\x02h2",
+        .alpn_protos = proto,
         .non_block = true,
     };    
     if ((hd->http2_tls = esp_tls_conn_http_new(uri, &tls_cfg)) == NULL) {
         ESP_LOGE(TAG, "[sh2-connect] esp-tls connection failed");
         goto error;
     }
+    struct http_parser_url u;
+    http_parser_url_init(&u);
+    http_parser_parse_url(uri, strlen(uri), 0, &u);
+    hd->hostname = strndup(&uri[u.field_data[UF_HOST].off], u.field_data[UF_HOST].len);
 
     /* HTTP/2 Connection */
     if (do_http2_connect(hd) != 0) {

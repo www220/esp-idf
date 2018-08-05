@@ -16,7 +16,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "controller.h"
 #include "driver/uart.h"
 
 #include "esp_bt.h"
@@ -27,8 +26,9 @@
 #include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
 #include "esp_system.h"
-#include "btc_main.h"
 #include "esp_gatt_common_api.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
 
 #define GATTC_TAG                   "GATTC_SPP_DEMO"
 #define PROFILE_NUM                 1
@@ -88,7 +88,8 @@ static esp_ble_scan_params_t ble_scan_params = {
     .own_addr_type          = BLE_ADDR_TYPE_PUBLIC,
     .scan_filter_policy     = BLE_SCAN_FILTER_ALLOW_ALL,
     .scan_interval          = 0x50,
-    .scan_window            = 0x30
+    .scan_window            = 0x30,
+    .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
 static const char device_name[] = "ESP_SPP_SERVER";

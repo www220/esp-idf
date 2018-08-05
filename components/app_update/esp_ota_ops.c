@@ -191,7 +191,7 @@ esp_err_t esp_ota_write(esp_ota_handle_t handle, const void *data, size_t size)
     }
 
     //if go to here ,means don't find the handle
-    ESP_LOGE(TAG,"not found the handle")
+    ESP_LOGE(TAG,"not found the handle");
     return ESP_ERR_INVALID_ARG;
 }
 
@@ -239,14 +239,6 @@ esp_err_t esp_ota_end(esp_ota_handle_t handle)
         ret = ESP_ERR_OTA_VALIDATE_FAILED;
         goto cleanup;
     }
-
-#ifdef CONFIG_SECURE_BOOT_ENABLED
-    ret = esp_secure_boot_verify_signature(it->part->address, data.image_len);
-    if (ret != ESP_OK) {
-        ret = ESP_ERR_OTA_VALIDATE_FAILED;
-        goto cleanup;
-    }
-#endif
 
  cleanup:
     LIST_REMOVE(it, entries);

@@ -35,10 +35,16 @@
 #include "esp_err.h"
 #include "esp_wifi_types.h"
 #include "esp_event.h"
+#include "esp_wifi.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct {
+    QueueHandle_t handle; /**< FreeRTOS queue handler */
+    void *storage;        /**< storage for FreeRTOS queue */
+} wifi_static_queue_t;
 
 /**
  * @brief Initialize Wi-Fi Driver
@@ -120,6 +126,39 @@ esp_err_t esp_wifi_internal_reg_rxcb(wifi_interface_t ifx, wifi_rxcb_t fn);
   *     - others : fail
   */
 esp_err_t esp_wifi_internal_set_sta_ip(void);
+
+/**
+  * @brief     Check the MD5 values of the OS adapter header files in IDF and WiFi library
+  *
+  * @attention 1. It is used for internal CI version check
+  *
+  * @return
+  *     - ESP_OK : succeed
+  *     - ESP_WIFI_INVALID_ARG : MD5 check fail
+  */
+esp_err_t esp_wifi_internal_osi_funcs_md5_check(const char *md5);
+
+/**
+  * @brief     Check the MD5 values of the crypto types header files in IDF and WiFi library
+  *
+  * @attention 1. It is used for internal CI version check
+  *
+  * @return
+  *     - ESP_OK : succeed
+  *     - ESP_WIFI_INVALID_ARG : MD5 check fail
+  */
+esp_err_t esp_wifi_internal_crypto_funcs_md5_check(const char *md5);
+
+/**
+  * @brief     Check the git commit id of WiFi library
+  *
+  * @attention 1. It is used for internal CI WiFi library check
+  *
+  * @return
+  *     - ESP_OK : succeed
+  *     - ESP_FAIL : fail
+  */
+esp_err_t esp_wifi_internal_git_commit_id_check(void);
 
 /**
   * @brief     Allocate a chunk of memory for WiFi driver

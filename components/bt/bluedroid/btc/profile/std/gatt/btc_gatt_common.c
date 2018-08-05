@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "btc_task.h"
-#include "btc_main.h"
-#include "btc_dm.h"
-#include "future.h"
+#include "btc/btc_task.h"
+#include "btc/btc_main.h"
+#include "btc/btc_dm.h"
+#include "osi/future.h"
 #include "esp_err.h"
-#include "btc_config.h"
-#include "alarm.h"
-#include "btc_ble_storage.h"
+#include "btc/btc_config.h"
+#include "osi/alarm.h"
+#include "btc/btc_ble_storage.h"
 #include "btc_gatt_common.h"
-#include "bta_gatt_common.h"
+#include "bta/bta_gatt_common.h"
 
 
 static void btc_set_local_mtu(uint16_t mtu)
@@ -31,7 +31,7 @@ static void btc_set_local_mtu(uint16_t mtu)
 
 void btc_gatt_com_call_handler(btc_msg_t *msg)
 {
-    LOG_DEBUG("%s act %d\n", __func__, msg->act);
+    BTC_TRACE_DEBUG("%s act %d\n", __func__, msg->act);
     switch (msg->act) {
     case BTC_GATT_ACT_SET_LOCAL_MTU:
     {
@@ -40,7 +40,7 @@ void btc_gatt_com_call_handler(btc_msg_t *msg)
         break;
     }
     default:
-        LOG_ERROR("%s UNKNOWN ACT %d\n", __func__, msg->act);
+        BTC_TRACE_ERROR("%s UNKNOWN ACT %d\n", __func__, msg->act);
         break;
     }
 }

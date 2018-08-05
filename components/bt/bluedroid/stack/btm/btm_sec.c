@@ -27,14 +27,14 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "bt_types.h"
-#include "controller.h"
-#include "hcimsgs.h"
-#include "btu.h"
+#include "stack/bt_types.h"
+#include "device/controller.h"
+#include "stack/hcimsgs.h"
+#include "stack/btu.h"
 #include "btm_int.h"
 #include "l2c_int.h"
-#include "fixed_queue.h"
-#include "alarm.h"
+#include "osi/fixed_queue.h"
+#include "osi/alarm.h"
 
 #if (BT_USE_TRACES == TRUE && BT_TRACE_VERBOSE == FALSE)
 /* needed for sprintf() */
@@ -231,7 +231,7 @@ BOOLEAN BTM_SecRegister(tBTM_APPL_INFO *p_cb_info)
     BTM_TRACE_EVENT("%s application registered\n", __func__);
 
 #if BLE_INCLUDED == TRUE && SMP_INCLUDED == TRUE
-    LOG_DEBUG("%s p_cb_info->p_le_callback == 0x%p\n", __func__, p_cb_info->p_le_callback);
+    BTM_TRACE_DEBUG("%s p_cb_info->p_le_callback == 0x%p\n", __func__, p_cb_info->p_le_callback);
     if (p_cb_info->p_le_callback) {
         BTM_TRACE_EVENT("%s SMP_Register( btm_proc_smp_cback )\n", __func__);
         SMP_Register(btm_proc_smp_cback);
@@ -240,13 +240,13 @@ BOOLEAN BTM_SecRegister(tBTM_APPL_INFO *p_cb_info)
             btm_ble_reset_id();
         }
     } else {
-        LOG_WARN("%s p_cb_info->p_le_callback == NULL\n", __func__);
+        BTM_TRACE_WARNING("%s p_cb_info->p_le_callback == NULL\n", __func__);
     }
 #endif
 
     btm_cb.api = *p_cb_info;
 #if BLE_INCLUDED == TRUE && SMP_INCLUDED == TRUE
-    LOG_DEBUG("%s btm_cb.api.p_le_callback = 0x%p\n", __func__, btm_cb.api.p_le_callback);
+    BTM_TRACE_DEBUG("%s btm_cb.api.p_le_callback = 0x%p\n", __func__, btm_cb.api.p_le_callback);
 #endif
     BTM_TRACE_EVENT("%s application registered\n", __func__);
     return (TRUE);
@@ -1524,7 +1524,7 @@ void BTM_ConfirmReqReply(tBTM_STATUS res, BD_ADDR bd_addr)
 **                  BTM_MIN_PASSKEY_VAL(0) - BTM_MAX_PASSKEY_VAL(999999(0xF423F)).
 **
 *******************************************************************************/
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE && SMP_INCLUDED == TRUE)
+#if (BT_SSP_INCLUDED == TRUE && SMP_INCLUDED == TRUE)
 void BTM_PasskeyReqReply(tBTM_STATUS res, BD_ADDR bd_addr, UINT32 passkey)
 {
 #if (BT_USE_TRACES == TRUE && SMP_INCLUDED == TRUE)
@@ -1572,7 +1572,7 @@ void BTM_PasskeyReqReply(tBTM_STATUS res, BD_ADDR bd_addr, UINT32 passkey)
         btsnd_hcic_user_passkey_reply (bd_addr, passkey);
     }
 }
-#endif  ///BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE && SMP_INCLUDED == TRUE
+#endif  ///BT_SSP_INCLUDED == TRUE && SMP_INCLUDED == TRUE
 
 /*******************************************************************************
 **
@@ -1588,7 +1588,7 @@ void BTM_PasskeyReqReply(tBTM_STATUS res, BD_ADDR bd_addr, UINT32 passkey)
 **                  type - notification type
 **
 *******************************************************************************/
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE && SMP_INCLUDED == TRUE)
+#if (BT_SSP_INCLUDED == TRUE && SMP_INCLUDED == TRUE)
 void BTM_SendKeypressNotif(BD_ADDR bd_addr, tBTM_SP_KEY_TYPE type)
 {
     /* This API only make sense between PASSKEY_REQ and SP complete */
@@ -1596,7 +1596,7 @@ void BTM_SendKeypressNotif(BD_ADDR bd_addr, tBTM_SP_KEY_TYPE type)
         btsnd_hcic_send_keypress_notif (bd_addr, type);
     }
 }
-#endif  ///BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE && SMP_INCLUDED == TRUE
+#endif  ///BT_SSP_INCLUDED == TRUE && SMP_INCLUDED == TRUE
 
 #if BTM_OOB_INCLUDED == TRUE && SMP_INCLUDED == TRUE
 /*******************************************************************************
@@ -2325,7 +2325,7 @@ tBTM_STATUS btm_sec_l2cap_access_req (BD_ADDR bd_addr, UINT16 psm, UINT16 handle
             2046 may report HCI_Encryption_Change and L2C Connection Request out of sequence
             because of data path issues. Delay this disconnect a little bit
             */
-            LOG_INFO("%s peer should have initiated security process by now (SM4 to SM4)\n", __func__);
+            BTM_TRACE_API("%s peer should have initiated security process by now (SM4 to SM4)\n", __func__);
             p_dev_rec->p_callback        = p_callback;
             p_dev_rec->sec_state         = BTM_SEC_STATE_DELAY_FOR_ENC;
             (*p_callback) (bd_addr, transport, p_ref_data, rc);
@@ -3504,7 +3504,7 @@ void btm_proc_sp_req_evt (tBTM_SP_EVT event, UINT8 *p)
             evt_data.cfm_req.just_works = TRUE;
 
             /* process user confirm req in association with the auth_req param */
-#if (BTM_LOCAL_IO_CAPS == BTM_IO_CAP_IO)
+// #if (BTM_LOCAL_IO_CAPS == BTM_IO_CAP_IO)
             if ( (p_dev_rec->rmt_io_caps == BTM_IO_CAP_IO)
                     &&  (btm_cb.devcb.loc_io_caps == BTM_IO_CAP_IO)
                     &&  ((p_dev_rec->rmt_auth_req & BTM_AUTH_SP_YES) || (btm_cb.devcb.loc_auth_req & BTM_AUTH_SP_YES)) ) {
@@ -3512,7 +3512,7 @@ void btm_proc_sp_req_evt (tBTM_SP_EVT event, UINT8 *p)
                    -> use authenticated link key */
                 evt_data.cfm_req.just_works = FALSE;
             }
-#endif
+// #endif
             BTM_TRACE_DEBUG ("btm_proc_sp_req_evt()  just_works:%d, io loc:%d, rmt:%d, auth loc:%d, rmt:%d\n",
                              evt_data.cfm_req.just_works, btm_cb.devcb.loc_io_caps, p_dev_rec->rmt_io_caps,
                              btm_cb.devcb.loc_auth_req, p_dev_rec->rmt_auth_req);
@@ -3532,7 +3532,7 @@ void btm_proc_sp_req_evt (tBTM_SP_EVT event, UINT8 *p)
             btm_sec_change_pairing_state (BTM_PAIR_STATE_WAIT_AUTH_COMPLETE);
             break;
 
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
+#if (BT_SSP_INCLUDED == TRUE)
         case BTM_SP_KEY_REQ_EVT:
             /* HCI_USER_PASSKEY_REQUEST_EVT */
             btm_sec_change_pairing_state (BTM_PAIR_STATE_KEY_ENTRY);
@@ -3555,14 +3555,13 @@ void btm_proc_sp_req_evt (tBTM_SP_EVT event, UINT8 *p)
             BTM_TRACE_DEBUG ("calling BTM_ConfirmReqReply with status: %d\n", status);
             BTM_ConfirmReqReply (status, p_bda);
         }
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
+#if (BT_SSP_INCLUDED == TRUE)
         else if (event == BTM_SP_KEY_REQ_EVT) {
             BTM_PasskeyReqReply(status, p_bda, 0);
         }
 #endif
         return;
     }
-
     /* Something bad. we can only fail this connection */
     btm_cb.acl_disc_reason = HCI_ERR_HOST_REJECT_SECURITY;
 
@@ -3579,7 +3578,8 @@ void btm_proc_sp_req_evt (tBTM_SP_EVT event, UINT8 *p)
             btm_sec_disconnect (p_dev_rec->hci_handle, HCI_ERR_AUTH_FAILURE);
         }
     }
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
+
+#if (BT_SSP_INCLUDED == TRUE)
     else {
         btsnd_hcic_user_passkey_neg_reply(p_bda);
     }
@@ -4018,6 +4018,7 @@ void btm_sec_encrypt_change (UINT16 handle, UINT8 status, UINT8 encr_enable)
 #if BLE_INCLUDED == TRUE && SMP_INCLUDED == TRUE
     tACL_CONN       *p_acl = NULL;
     UINT8           acl_idx = btm_handle_to_acl_index(handle);
+    tGATT_TCB       *p_tcb = NULL;
 #endif
     BTM_TRACE_EVENT ("Security Manager: encrypt_change status:%d State:%d, encr_enable = %d\n",
                      status, (p_dev_rec) ? p_dev_rec->sec_state : 0, encr_enable);
@@ -4045,6 +4046,14 @@ void btm_sec_encrypt_change (UINT16 handle, UINT8 status, UINT8 encr_enable)
                 p_dev_rec->sec_flags |= BTM_SEC_16_DIGIT_PIN_AUTHED;
             }
         } else {
+#if BLE_INCLUDED == TRUE
+            /* Before the application layer has received the connection event, the device has received an 
+            encrypted request from the peer device. The device should wait until the application layer 
+            receives the connection event before updating 'sec_flags'. */
+            if ((p_tcb = gatt_find_tcb_by_addr(p_dev_rec->ble.pseudo_addr, BT_TRANSPORT_LE)) == NULL) {
+               //do nothing
+            } else
+#endif
             p_dev_rec->sec_flags |= (BTM_SEC_LE_AUTHENTICATED | BTM_SEC_LE_ENCRYPTED);
         }
     }
@@ -4840,7 +4849,7 @@ static void btm_sec_pairing_timeout (TIMER_LIST_ENT *p_tle)
         /* btm_sec_change_pairing_state (BTM_PAIR_STATE_IDLE); */
         break;
 
-#if (BTM_LOCAL_IO_CAPS != BTM_IO_CAP_NONE)
+#if (BT_SSP_INCLUDED == TRUE)
     case BTM_PAIR_STATE_KEY_ENTRY:
         btsnd_hcic_user_passkey_neg_reply(p_cb->pairing_bda);
         /* btm_sec_change_pairing_state (BTM_PAIR_STATE_IDLE); */

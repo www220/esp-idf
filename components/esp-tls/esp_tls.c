@@ -83,6 +83,7 @@ static int esp_tcp_connect(const char *host, int hostlen, int port)
 
     int ret = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (ret < 0) {
+        ESP_LOGE(TAG, "Failed to create socket (family %d socktype %d protocol %d)", res->ai_family, res->ai_socktype, res->ai_protocol);
         goto err_freeaddr;
     }
     int fd = ret;
@@ -98,12 +99,13 @@ static int esp_tcp_connect(const char *host, int hostlen, int port)
         p->sin6_family = AF_INET6;
         addr_ptr = p;
     } else {
-	/* Unsupported Protocol Family */
+        ESP_LOGE(TAG, "Unsupported protocol family %d", res->ai_family);
         goto err_freesocket;
     }
 
     ret = connect(fd, addr_ptr, res->ai_addrlen);
     if (ret < 0) {
+        ESP_LOGE(TAG, "Failed to connnect to host (errno %d)", errno);
         goto err_freesocket;
     }
 
@@ -136,7 +138,7 @@ static void mbedtls_cleanup(esp_tls_t *tls)
     if (!tls) {
         return;
     }
-    
+    mbedtls_x509_crt_free(&tls->cacert);
     mbedtls_entropy_free(&tls->entropy);
     mbedtls_ssl_config_free(&tls->conf);
     mbedtls_ctr_drbg_free(&tls->ctr_drbg);
@@ -180,6 +182,10 @@ static int create_ssl_handle(esp_tls_t *tls, const char *hostname, size_t hostle
                     MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
         ESP_LOGE(TAG, "mbedtls_ssl_config_defaults returned %d", ret);
         goto exit;
+    }
+
+    if (cfg->alpn_protos) {
+        mbedtls_ssl_conf_alpn_protocols(&tls->conf, cfg->alpn_protos);
     }
 
     if (cfg->cacert_pem_buf != NULL) {
@@ -230,11 +236,13 @@ exit:
  */
 void esp_tls_conn_delete(esp_tls_t *tls)
 {
-    mbedtls_cleanup(tls);
-    if (tls->sockfd) {
-        close(tls->sockfd);
+    if (tls != NULL) {
+        mbedtls_cleanup(tls);
+        if (tls->sockfd) {
+            close(tls->sockfd);
+        }
+        free(tls);
     }
-    free(tls);
 };
 
 static ssize_t tcp_write(esp_tls_t *tls, const char *data, size_t datalen)
@@ -277,13 +285,12 @@ esp_tls_t *esp_tls_conn_new(const char *hostname, int hostlen, int port, const e
             esp_tls_conn_delete(tls);
             return NULL;
         }
-	tls->read = tls_read;
-	tls->write = tls_write;
-    }
-
-    if (cfg->non_block == true) {
-        int flags = fcntl(tls->sockfd, F_GETFL, 0);
-        fcntl(tls->sockfd, F_SETFL, flags | O_NONBLOCK);    
+    	tls->read = tls_read;
+    	tls->write = tls_write;
+        if (cfg->non_block == true) {
+            int flags = fcntl(tls->sockfd, F_GETFL, 0);
+            fcntl(tls->sockfd, F_SETFL, flags | O_NONBLOCK);
+        }
     }
 
     return tls;

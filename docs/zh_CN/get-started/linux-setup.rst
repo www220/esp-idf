@@ -1,6 +1,7 @@
 *****************************
 Linux 平台工具链的标准设置
 *****************************
+:link_to_translation:`en:[English]`
 
 安装前提
 =====================
@@ -54,7 +55,7 @@ Linux 版的 ESP32 工具链可以从 Espressif 的网站下载：
 
     .. note::
     
-        如果将 ``/bin/bash`` 设置为登录 shell，且同时存在 ``.bash_profile`` 和 ``.profile``，则更新 ``.bash_profile`` 。
+        如果将 ``/bin/bash`` 设置为登录 shell，且同时存在 ``.bash_profile`` 和 ``.profile``，则更新 ``.bash_profile`` 。在 CentOS 环境下, ``alias`` 需要添加到 ``.bashrc`` 文件中。
     
 3. 退出并重新登录以使 ``.profile`` 更改生效。 运行以下命令来检查 ``PATH`` 设置是否正确： ::
 

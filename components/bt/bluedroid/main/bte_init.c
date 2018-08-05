@@ -23,7 +23,7 @@
  *
  ******************************************************************************/
 
-#include "bt_target.h"
+#include "common/bt_target.h"
 #include <string.h>
 
 
@@ -37,7 +37,7 @@
 
 #if (defined(RFCOMM_INCLUDED) && RFCOMM_INCLUDED == TRUE)
 // Include initialization functions definitions
-#include "port_api.h"
+#include "stack/port_api.h"
 #endif
 
 #if (defined(BNEP_INCLUDED) && BNEP_INCLUDED == TRUE)
@@ -45,7 +45,7 @@
 #endif
 
 #if (defined(GAP_INCLUDED) && GAP_INCLUDED == TRUE)
-#include "gap_api.h"
+#include "stack/gap_api.h"
 #endif
 
 #if (defined(PAN_INCLUDED) && PAN_INCLUDED == TRUE)
@@ -53,11 +53,11 @@
 #endif
 
 #if (defined(AVRC_INCLUDED) && AVRC_INCLUDED == TRUE)
-#include "avrc_api.h"
+#include "stack/avrc_api.h"
 #endif
 
 #if (defined(A2D_INCLUDED) && A2D_INCLUDED == TRUE)
-#include "a2d_api.h"
+#include "stack/a2d_api.h"
 #endif
 
 #if (defined(AVDT_INCLUDED) && AVDT_INCLUDED == TRUE)
@@ -69,7 +69,7 @@
 #endif
 
 #if (defined(HID_HOST_INCLUDED) && HID_HOST_INCLUDED == TRUE)
-#include "hidh_api.h"
+#include "stack/hidh_api.h"
 #endif
 
 #if (defined(MCA_INCLUDED) && MCA_INCLUDED == TRUE)
@@ -77,19 +77,21 @@
 #endif
 
 #if (defined(BLE_INCLUDED) && BLE_INCLUDED == TRUE)
-#include "gatt_api.h"
+#include "stack/gatt_api.h"
 #if (defined(SMP_INCLUDED) && SMP_INCLUDED == TRUE)
-#include "smp_api.h"
+#include "stack/smp_api.h"
 #endif
 #endif
 
 //BTA Modules
 #if BTA_INCLUDED == TRUE && BTA_DYNAMIC_MEMORY == TRUE
-#include "bta_api.h"
-#include "bta_sys.h"
-#include "allocator.h"
+#include "bta/bta_api.h"
+#include "bta/bta_sys.h"
+#include "osi/allocator.h"
 
-//#include "bta_ag_int.h"
+#if BTA_HF_INCLUDED == TRUE
+#include "bta_hf_client_int.h"
+#endif
 
 #if BTA_SDP_INCLUDED == TRUE
 #include "bta_sdp_int.h"
@@ -227,7 +229,13 @@ void BTE_InitStack(void)
     memset((void *)bta_dm_search_cb_ptr, 0, sizeof(tBTA_DM_SEARCH_CB));
     memset((void *)bta_dm_di_cb_ptr, 0, sizeof(tBTA_DM_DI_CB));
     //memset((void *)bta_prm_cb_ptr, 0, sizeof(tBTA_PRM_CB));
-    //memset((void *)bta_ag_cb_ptr, 0, sizeof(tBTA_AG_CB));
+
+#if (defined BTA_HF_INCLUDED && BTA_HF_INCLUDED == TRUE)
+    if ((bta_hf_client_cb_ptr = (tBTA_HF_CLIENT_CB *)osi_malloc(sizeof(tBTA_HF_CLIENT_CB))) == NULL) {
+        return;
+    }
+    memset((void *)bta_hf_client_cb_ptr, 0, sizeof(tBTA_HF_CLIENT_CB));
+#endif
 #if (defined BTA_JV_INCLUDED && BTA_JV_INCLUDED == TRUE)
     if ((bta_jv_cb_ptr = (tBTA_JV_CB *)osi_malloc(sizeof(tBTA_JV_CB))) == NULL) {
         return;
@@ -327,6 +335,10 @@ void BTE_DeinitStack(void)
     osi_free(bta_jv_cb_ptr);
     bta_jv_cb_ptr = NULL;
 #endif //JV
+#if (defined BTA_HF_INCLUDED && BTA_HF_INCLUDED == TRUE)
+    osi_free(bta_hf_client_cb_ptr);
+    bta_hf_client_cb_ptr = NULL;
+#endif
     osi_free(bta_dm_di_cb_ptr);
     bta_dm_di_cb_ptr = NULL;
     osi_free(bta_dm_search_cb_ptr);

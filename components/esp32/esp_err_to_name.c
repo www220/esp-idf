@@ -10,6 +10,9 @@
 #if __has_include("esp_err.h")
 #include "esp_err.h"
 #endif
+#if __has_include("esp_http_client.h")
+#include "esp_http_client.h"
+#endif
 #if __has_include("esp_image_format.h")
 #include "esp_image_format.h"
 #endif
@@ -34,6 +37,9 @@
 #if __has_include("esp_wps.h")
 #include "esp_wps.h"
 #endif
+#if __has_include("http_server.h")
+#include "http_server.h"
+#endif
 #if __has_include("nvs.h")
 #include "nvs.h"
 #endif
@@ -52,43 +58,43 @@ typedef struct {
 static const esp_err_msg_t esp_err_msg_table[] = {
     // components/esp32/include/esp_err.h
 #   ifdef      ESP_FAIL
-    ERR_TBL_IT(ESP_FAIL),                                   /*    -1 */
+    ERR_TBL_IT(ESP_FAIL),                                   /*    -1 Generic esp_err_t code indicating failure */
 #   endif
 #   ifdef      ESP_OK
-    ERR_TBL_IT(ESP_OK),                                     /*     0 */
+    ERR_TBL_IT(ESP_OK),                                     /*     0 esp_err_t value indicating success (no error) */
 #   endif
 #   ifdef      ESP_ERR_NO_MEM
-    ERR_TBL_IT(ESP_ERR_NO_MEM),                             /*   257 0x101 */
+    ERR_TBL_IT(ESP_ERR_NO_MEM),                             /*   257 0x101 Out of memory */
 #   endif
 #   ifdef      ESP_ERR_INVALID_ARG
-    ERR_TBL_IT(ESP_ERR_INVALID_ARG),                        /*   258 0x102 */
+    ERR_TBL_IT(ESP_ERR_INVALID_ARG),                        /*   258 0x102 Invalid argument */
 #   endif
 #   ifdef      ESP_ERR_INVALID_STATE
-    ERR_TBL_IT(ESP_ERR_INVALID_STATE),                      /*   259 0x103 */
+    ERR_TBL_IT(ESP_ERR_INVALID_STATE),                      /*   259 0x103 Invalid state */
 #   endif
 #   ifdef      ESP_ERR_INVALID_SIZE
-    ERR_TBL_IT(ESP_ERR_INVALID_SIZE),                       /*   260 0x104 */
+    ERR_TBL_IT(ESP_ERR_INVALID_SIZE),                       /*   260 0x104 Invalid size */
 #   endif
 #   ifdef      ESP_ERR_NOT_FOUND
-    ERR_TBL_IT(ESP_ERR_NOT_FOUND),                          /*   261 0x105 */
+    ERR_TBL_IT(ESP_ERR_NOT_FOUND),                          /*   261 0x105 Requested resource not found */
 #   endif
 #   ifdef      ESP_ERR_NOT_SUPPORTED
-    ERR_TBL_IT(ESP_ERR_NOT_SUPPORTED),                      /*   262 0x106 */
+    ERR_TBL_IT(ESP_ERR_NOT_SUPPORTED),                      /*   262 0x106 Operation or feature not supported */
 #   endif
 #   ifdef      ESP_ERR_TIMEOUT
-    ERR_TBL_IT(ESP_ERR_TIMEOUT),                            /*   263 0x107 */
+    ERR_TBL_IT(ESP_ERR_TIMEOUT),                            /*   263 0x107 Operation timed out */
 #   endif
 #   ifdef      ESP_ERR_INVALID_RESPONSE
-    ERR_TBL_IT(ESP_ERR_INVALID_RESPONSE),                   /*   264 0x108 */
+    ERR_TBL_IT(ESP_ERR_INVALID_RESPONSE),                   /*   264 0x108 Received response was invalid */
 #   endif
 #   ifdef      ESP_ERR_INVALID_CRC
-    ERR_TBL_IT(ESP_ERR_INVALID_CRC),                        /*   265 0x109 */
+    ERR_TBL_IT(ESP_ERR_INVALID_CRC),                        /*   265 0x109 CRC or checksum was invalid */
 #   endif
 #   ifdef      ESP_ERR_INVALID_VERSION
-    ERR_TBL_IT(ESP_ERR_INVALID_VERSION),                    /*   266 0x10a */
+    ERR_TBL_IT(ESP_ERR_INVALID_VERSION),                    /*   266 0x10a Version was invalid */
 #   endif
 #   ifdef      ESP_ERR_INVALID_MAC
-    ERR_TBL_IT(ESP_ERR_INVALID_MAC),                        /*   267 0x10b */
+    ERR_TBL_IT(ESP_ERR_INVALID_MAC),                        /*   267 0x10b MAC address was invalid */
 #   endif
     // components/nvs_flash/include/nvs.h
 #   ifdef      ESP_ERR_NVS_BASE
@@ -129,7 +135,7 @@ static const esp_err_msg_t esp_err_msg_table[] = {
     ERR_TBL_IT(ESP_ERR_NVS_KEY_TOO_LONG),                   /*  4361 0x1109 Key name is too long */
 #   endif
 #   ifdef      ESP_ERR_NVS_PAGE_FULL
-    ERR_TBL_IT(ESP_ERR_NVS_PAGE_FULL),                      /*  4362 0x110a Internal error; never returned by nvs_ API
+    ERR_TBL_IT(ESP_ERR_NVS_PAGE_FULL),                      /*  4362 0x110a Internal error; never returned by nvs API
                                                                             functions */
 #   endif
 #   ifdef      ESP_ERR_NVS_INVALID_STATE
@@ -360,6 +366,9 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   ifdef      ESP_ERR_MESH_DISCARD
     ERR_TBL_IT(ESP_ERR_MESH_DISCARD),                       /* 16405 0x4015 */
 #   endif
+#   ifdef      ESP_ERR_MESH_VOTING
+    ERR_TBL_IT(ESP_ERR_MESH_VOTING),                        /* 16406 0x4016 */
+#   endif
     // components/tcpip_adapter/include/tcpip_adapter.h
 #   ifdef      ESP_ERR_TCPIP_ADAPTER_BASE
     ERR_TBL_IT(ESP_ERR_TCPIP_ADAPTER_BASE),                 /* 20480 0x5000 */
@@ -394,6 +403,57 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   endif
 #   ifdef      ESP_ERR_PING_NO_MEM
     ERR_TBL_IT(ESP_ERR_PING_NO_MEM),                        /* 24578 0x6002 */
+#   endif
+    // components/esp_http_client/include/esp_http_client.h
+#   ifdef      ESP_ERR_HTTP_BASE
+    ERR_TBL_IT(ESP_ERR_HTTP_BASE),                          /* 28672 0x7000 Starting number of HTTP error codes */
+#   endif
+#   ifdef      ESP_ERR_HTTP_MAX_REDIRECT
+    ERR_TBL_IT(ESP_ERR_HTTP_MAX_REDIRECT),                  /* 28673 0x7001 The error exceeds the number of HTTP redirects */
+#   endif
+#   ifdef      ESP_ERR_HTTP_CONNECT
+    ERR_TBL_IT(ESP_ERR_HTTP_CONNECT),                       /* 28674 0x7002 Error open the HTTP connection */
+#   endif
+#   ifdef      ESP_ERR_HTTP_WRITE_DATA
+    ERR_TBL_IT(ESP_ERR_HTTP_WRITE_DATA),                    /* 28675 0x7003 Error write HTTP data */
+#   endif
+#   ifdef      ESP_ERR_HTTP_FETCH_HEADER
+    ERR_TBL_IT(ESP_ERR_HTTP_FETCH_HEADER),                  /* 28676 0x7004 Error read HTTP header from server */
+#   endif
+#   ifdef      ESP_ERR_HTTP_INVALID_TRANSPORT
+    ERR_TBL_IT(ESP_ERR_HTTP_INVALID_TRANSPORT),             /* 28677 0x7005 There are no transport support for the input
+                                                                            scheme */
+#   endif
+    // components/http_server/include/http_server.h
+#   ifdef      ESP_ERR_HTTPD_BASE
+    ERR_TBL_IT(ESP_ERR_HTTPD_BASE),                         /* 32768 0x8000 Starting number of HTTPD error codes */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_HANDLERS_FULL
+    ERR_TBL_IT(ESP_ERR_HTTPD_HANDLERS_FULL),                /* 32769 0x8001 All slots for registering URI handlers have
+                                                                            been consumed */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_HANDLER_EXISTS
+    ERR_TBL_IT(ESP_ERR_HTTPD_HANDLER_EXISTS),               /* 32770 0x8002 URI handler with same method and target URI
+                                                                            already registered */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_INVALID_REQ
+    ERR_TBL_IT(ESP_ERR_HTTPD_INVALID_REQ),                  /* 32771 0x8003 Invalid request pointer */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_RESULT_TRUNC
+    ERR_TBL_IT(ESP_ERR_HTTPD_RESULT_TRUNC),                 /* 32772 0x8004 Result string truncated */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_RESP_HDR
+    ERR_TBL_IT(ESP_ERR_HTTPD_RESP_HDR),                     /* 32773 0x8005 Response header field larger than supported */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_RESP_SEND
+    ERR_TBL_IT(ESP_ERR_HTTPD_RESP_SEND),                    /* 32774 0x8006 Error occured while sending response packet */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_ALLOC_MEM
+    ERR_TBL_IT(ESP_ERR_HTTPD_ALLOC_MEM),                    /* 32775 0x8007 Failed to dynamically allocate memory for
+                                                                            resource */
+#   endif
+#   ifdef      ESP_ERR_HTTPD_TASK
+    ERR_TBL_IT(ESP_ERR_HTTPD_TASK),                         /* 32776 0x8008 Failed to launch server task/thread */
 #   endif
     // components/spi_flash/include/esp_spi_flash.h
 #   ifdef      ESP_ERR_FLASH_BASE
@@ -447,7 +507,7 @@ const char *esp_err_to_name_r(esp_err_t code, char *buf, size_t buflen)
         return buf;
     }
 
-    snprintf(buf, buflen, "Unknown error %d", code);
+    snprintf(buf, buflen, "%s 0x%x(%d)", esp_unknown_msg, code, code);
 
     return buf;
 }

@@ -16,18 +16,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "bt_defs.h"
-#include "bt_trace.h"
-#include "alarm.h"
-#include "allocator.h"
-#include "bdaddr.h"
-#include "btc_config.h"
-#include "btc_util.h"
-#include "config.h"
-#include "osi.h"
-#include "mutex.h"
+#include "common/bt_defs.h"
+#include "common/bt_trace.h"
+#include "osi/alarm.h"
+#include "osi/allocator.h"
+#include "device/bdaddr.h"
+#include "btc/btc_config.h"
+#include "btc/btc_util.h"
+#include "osi/config.h"
+#include "osi/osi.h"
+#include "osi/mutex.h"
 
-#include "bt_types.h"
+#include "stack/bt_types.h"
 
 static const char *CONFIG_FILE_PATH = "bt_config.conf";
 static const period_ms_t CONFIG_SETTLE_PERIOD_MS = 3000;
@@ -73,10 +73,10 @@ bool btc_config_init(void)
     osi_mutex_new(&lock);
     config = config_new(CONFIG_FILE_PATH);
     if (!config) {
-        LOG_WARN("%s unable to load config file; starting unconfigured.\n", __func__);
+        BTC_TRACE_WARNING("%s unable to load config file; starting unconfigured.\n", __func__);
         config = config_new_empty();
         if (!config) {
-            LOG_ERROR("%s unable to allocate a config object.\n", __func__);
+            BTC_TRACE_ERROR("%s unable to allocate a config object.\n", __func__);
             goto error;
         }
     }
@@ -90,7 +90,7 @@ error:;
     config_free(config);
     osi_mutex_free(&lock);
     config = NULL;
-    LOG_ERROR("%s failed\n", __func__);
+    BTC_TRACE_ERROR("%s failed\n", __func__);
     return false;
 }
 

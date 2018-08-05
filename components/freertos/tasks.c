@@ -2151,6 +2151,23 @@ void vTaskSuspendAll( void )
 
 #if ( configUSE_TICKLESS_IDLE != 0 )
 
+	static BaseType_t xHaveReadyTasks()
+	{
+		for (int i = tskIDLE_PRIORITY + 1; i < configMAX_PRIORITIES; ++i)
+		{
+			if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ i ] ) ) > 0 )
+			{
+				return pdTRUE;
+			}
+			else
+			{
+				mtCOVERAGE_TEST_MARKER();
+			}
+		}
+		return pdFALSE;
+	}
+
+
 	static TickType_t prvGetExpectedIdleTime( void )
 	{
 	TickType_t xReturn;
@@ -2161,7 +2178,18 @@ void vTaskSuspendAll( void )
 		{
 			xReturn = 0;
 		}
-		else if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ tskIDLE_PRIORITY ] ) ) > 1 )
+#if portNUM_PROCESSORS > 1
+		/* This function is called from Idle task; in single core case this
+		 * means that no higher priority tasks are ready to run, and we can
+		 * enter sleep. In SMP case, there might be ready tasks waiting for
+		 * the other CPU, so need to check all ready lists.
+		 */
+		else if( xHaveReadyTasks() )
+		{
+			xReturn = 0;
+		}
+#endif // portNUM_PROCESSORS > 1
+		else if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ tskIDLE_PRIORITY ] ) ) > portNUM_PROCESSORS )
 		{
 			/* There are other idle priority tasks in the ready state.  If
 			time slicing is used then the very next tick interrupt must be
@@ -2431,7 +2459,7 @@ void rt_usage_info(uint32_t *major, uint32_t *minor)
 		*major /= 10;
 	}
 }
-#endif /* configUSE_TRACE_FACILITY */
+#endif /* configGENERATE_RUN_TIME_STATS */
 /*----------------------------------------------------------*/
 
 #if ( INCLUDE_xTaskGetIdleTaskHandle == 1 )
@@ -3438,7 +3466,6 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 		#endif /* configUSE_IDLE_HOOK */
 		{
 			/* Call the esp-idf hook system */
-			extern void esp_vApplicationIdleHook( void );
 			esp_vApplicationIdleHook();
 		}
 
@@ -3450,6 +3477,7 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 		#if ( configUSE_TICKLESS_IDLE != 0 )
 		{
 		TickType_t xExpectedIdleTime;
+		BaseType_t xEnteredSleep = pdFALSE;
 
 			/* It is not desirable to suspend then resume the scheduler on
 			each iteration of the idle task.  Therefore, a preliminary
@@ -3460,7 +3488,6 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 
 			if( xExpectedIdleTime >= configEXPECTED_IDLE_TIME_BEFORE_SLEEP )
 			{
-//				vTaskSuspendAll();
 				taskENTER_CRITICAL(&xTaskQueueMutex);
 				{
 					/* Now the scheduler is suspended, the expected idle
@@ -3472,7 +3499,7 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 					if( xExpectedIdleTime >= configEXPECTED_IDLE_TIME_BEFORE_SLEEP )
 					{
 						traceLOW_POWER_IDLE_BEGIN();
-						portSUPPRESS_TICKS_AND_SLEEP( xExpectedIdleTime );
+						xEnteredSleep = portSUPPRESS_TICKS_AND_SLEEP( xExpectedIdleTime );
 						traceLOW_POWER_IDLE_END();
 					}
 					else
@@ -3481,13 +3508,21 @@ static portTASK_FUNCTION( prvIdleTask, pvParameters )
 					}
 				}
 				taskEXIT_CRITICAL(&xTaskQueueMutex);
-//				( void ) xTaskResumeAll();
 			}
 			else
 			{
 				mtCOVERAGE_TEST_MARKER();
 			}
+			/* It might be possible to enter tickless idle again, so skip
+			 * the fallback sleep hook if tickless idle was successful
+			 */
+			if ( !xEnteredSleep )
+			{
+				esp_vApplicationWaitiHook();
+			}
 		}
+		#else
+		esp_vApplicationWaitiHook();
 		#endif /* configUSE_TICKLESS_IDLE */
 	}
 }
@@ -3783,6 +3818,10 @@ BaseType_t xTaskGetAffinity( TaskHandle_t xTask )
 				pxTaskStatusArray[ uxTask ].eCurrentState = eState;
 				pxTaskStatusArray[ uxTask ].uxCurrentPriority = pxNextTCB->uxPriority;
 
+				#if ( configTASKLIST_INCLUDE_COREID == 1 )
+				pxTaskStatusArray[ uxTask ].xCoreID = pxNextTCB->xCoreID;
+				#endif /* configTASKLIST_INCLUDE_COREID */
+
 				#if ( INCLUDE_vTaskSuspend == 1 )
 				{
 					/* If the task is in the suspended list then there is a chance
@@ -3911,6 +3950,10 @@ BaseType_t xTaskGetAffinity( TaskHandle_t xTask )
 
 	static void prvDeleteTCB( TCB_t *pxTCB )
 	{
+		/* This call is required for any port specific cleanup related to task.
+		It must be above the vPortFree() calls. */
+		portCLEAN_UP_TCB( pxTCB );
+
 		/* Free up the memory allocated by the scheduler for the task.  It is up
 		to the task to free any memory allocated at the application level. */
 		#if ( configUSE_NEWLIB_REENTRANT == 1 )
@@ -3953,7 +3996,6 @@ BaseType_t xTaskGetAffinity( TaskHandle_t xTask )
 				/* Neither the stack nor the TCB were allocated dynamically, so
 				nothing needs to be freed. */
 				configASSERT( pxTCB->ucStaticallyAllocated == tskSTATICALLY_ALLOCATED_STACK_AND_TCB	)
-				portCLEAN_UP_TCB( pxTCB );
 				mtCOVERAGE_TEST_MARKER();
 			}
 		}
@@ -4444,7 +4486,11 @@ For ESP32 FreeRTOS, vTaskExitCritical implements both portEXIT_CRITICAL and port
 				pcWriteBuffer = prvWriteNameToBuffer( pcWriteBuffer, pxTaskStatusArray[ x ].pcTaskName );
 
 				/* Write the rest of the string. */
+#if configTASKLIST_INCLUDE_COREID
+				sprintf( pcWriteBuffer, "\t%c\t%u\t%u\t%u\t%hd\r\n", cStatus, ( unsigned int ) pxTaskStatusArray[ x ].uxCurrentPriority, ( unsigned int ) pxTaskStatusArray[ x ].usStackHighWaterMark, ( unsigned int ) pxTaskStatusArray[ x ].xTaskNumber, ( int ) pxTaskStatusArray[ x ].xCoreID );
+#else
 				sprintf( pcWriteBuffer, "\t%c\t%u\t%u\t%u\r\n", cStatus, ( unsigned int ) pxTaskStatusArray[ x ].uxCurrentPriority, ( unsigned int ) pxTaskStatusArray[ x ].usStackHighWaterMark, ( unsigned int ) pxTaskStatusArray[ x ].xTaskNumber );
+#endif
 				pcWriteBuffer += strlen( pcWriteBuffer );
 			}
 

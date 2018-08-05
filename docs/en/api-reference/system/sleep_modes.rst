@@ -19,9 +19,9 @@ Once wakeup sources are configured, application can enter sleep mode using :cpp:
 WiFi/BT and sleep modes
 -----------------------
 
-In deep sleep mode, wireless peripherals are powered down. Before entering sleep mode, applications must disable WiFi and BT using appropriate calls ( :cpp:func:`esp_bluedroid_disable`, :cpp:func:`esp_bt_controller_disable`, :cpp:func:`esp_wifi_stop`). 
+In deep sleep and light sleep modes, wireless peripherals are powered down. Before entering deep sleep or light sleep modes, applications must disable WiFi and BT using appropriate calls (:cpp:func:`esp_bluedroid_disable`, :cpp:func:`esp_bt_controller_disable`, :cpp:func:`esp_wifi_stop`). WiFi and BT connections will not be maintained in deep sleep or light sleep, even if these functions are not called.
 
-WiFi can coexist with light sleep mode, allowing the chip to go into light sleep mode when there is no network activity, and waking up the chip from light sleep mode when required. However **APIs described in this section can not be used for that purpose**. :cpp:func:`esp_light_sleep_start` forces the chip to enter light sleep mode, regardless of whether WiFi is active or not. Automatic entry into light sleep mode, coordinated with WiFi driver, will be supported using a separate set of APIs.
+If WiFi connection needs to be maintained, enable WiFi modem sleep, and enable automatic light sleep feature (see :doc:`Power Management APIs <power_management>`). This will allow the system to wake up from sleep automatically when required by WiFi driver, thereby maintaining connection to the AP.
 
 Wakeup sources
 --------------
@@ -135,6 +135,13 @@ Add the following code before :cpp:func:`esp_deep_sleep_start` to remove this ex
 ```c++
 rtc_gpio_isolate(GPIO_NUM_12);
 ```
+
+UART output handling
+--------------------
+
+Before entering sleep mode, :cpp:func:`esp_deep_sleep_start` will flush the contents of UART FIFOs.
+
+When entering light sleep mode using :cpp:func:`esp_light_sleep_start`, UART FIFOs will not be flushed. Instead, UART output will be suspended, and remaining characters in the FIFO will be sent out after wakeup from light sleep.
 
 Checking sleep wakeup cause
 ---------------------------

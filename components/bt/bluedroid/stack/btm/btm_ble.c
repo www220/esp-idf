@@ -22,22 +22,22 @@
  *  security functions.
  *
  ******************************************************************************/
-#include "bt_target.h"
+#include "common/bt_target.h"
 
 #if BLE_INCLUDED == TRUE
 
 #include <string.h>
 
-#include "bt_types.h"
-#include "hcimsgs.h"
-#include "btu.h"
+#include "stack/bt_types.h"
+#include "stack/hcimsgs.h"
+#include "stack/btu.h"
 #include "btm_int.h"
-#include "btm_ble_api.h"
-#include "smp_api.h"
+#include "stack/btm_ble_api.h"
+#include "stack/smp_api.h"
 #include "l2c_int.h"
-#include "gap_api.h"
+#include "stack/gap_api.h"
 //#include "bt_utils.h"
-#include "controller.h"
+#include "device/controller.h"
 
 //#define LOG_TAG "bt_btm_ble"
 //#include "osi/include/log.h"
@@ -880,7 +880,7 @@ tBTM_SEC_ACTION btm_ble_determine_security_act(BOOLEAN is_originator, BD_ADDR bd
             auth_req |= BTM_LE_AUTH_REQ_MITM;
     }
 
-    tBTM_BLE_SEC_REQ_ACT ble_sec_act;
+    tBTM_BLE_SEC_REQ_ACT ble_sec_act = BTM_BLE_SEC_REQ_ACT_NONE;
     btm_ble_link_sec_check(bdaddr, auth_req, &ble_sec_act);
 
     BTM_TRACE_DEBUG ("%s ble_sec_act %d", __func__ , ble_sec_act);
@@ -1105,7 +1105,7 @@ BOOLEAN btm_ble_get_enc_key_type(BD_ADDR bd_addr, UINT8 *p_key_types)
 **
 ** Description      This function is called to read the local DIV
 **
-** Returns          TURE - if a valid DIV is availavle
+** Returns          TRUE - if a valid DIV is availavle
 *******************************************************************************/
 BOOLEAN btm_get_local_div (BD_ADDR bd_addr, UINT16 *p_div)
 {
@@ -1223,7 +1223,7 @@ void btm_sec_save_le_key(BD_ADDR bd_addr, tBTM_LE_KEY_TYPE key_type, tBTM_LE_KEY
             p_rec->ble.keys.key_size = p_keys->lenc_key.key_size;
             p_rec->ble.key_type |= BTM_LE_KEY_LENC;
 
-            /* Set that link key is known since this shares field with BTM_SEC_FLAG_LKEY_KNOWN flag in btm_api.h*/
+            /* Set that link key is known since this shares field with BTM_SEC_FLAG_LKEY_KNOWN flag in stack/btm_api.h*/
             p_rec->sec_flags |=  BTM_SEC_LE_LINK_KEY_KNOWN;
             if ( p_keys->pcsrk_key.sec_level == SMP_SEC_AUTHENTICATED) {
                 p_rec->sec_flags |= BTM_SEC_LE_LINK_KEY_AUTHED;
@@ -1948,14 +1948,6 @@ void btm_ble_conn_complete(UINT8 *p, UINT16 evt_len, BOOLEAN enhanced)
             handle = HCID_GET_HANDLE (handle);
 
             btm_ble_connected(bda, handle, HCI_ENCRYPT_MODE_DISABLED, role, bda_type, match);
-            if(role == HCI_ROLE_SLAVE) {
-                //clear p_cb->state, controller will stop adv when ble connected.
-                tBTM_BLE_INQ_CB *p_cb = &btm_cb.ble_ctr_cb.inq_var;
-                if(p_cb) {
-                    p_cb->adv_mode = BTM_BLE_ADV_DISABLE;
-                    p_cb->state = BTM_BLE_STOP_ADV; 
-                }
-            }
             l2cble_conn_comp (handle, role, bda, bda_type, conn_interval,
                               conn_latency, conn_timeout);
 
