@@ -313,6 +313,10 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stdout = (FILE*) &__sf_fake_stdout;
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
+#if 1
+	extern void rtthread_startup(void);
+	rtthread_startup();
+#endif
     esp_timer_init();
     esp_set_time_from_rtc();
 #if CONFIG_ESP32_APPTRACE_ENABLE
@@ -413,7 +417,7 @@ static void do_global_ctors(void)
 static void main_task(void* args)
 {
     // Now that the application is about to start, disable boot watchdogs
-    REG_CLR_BIT(TIMG_WDTCONFIG0_REG(0), TIMG_WDT_FLASHBOOT_MOD_EN_S);
+    REG_CLR_BIT(TIMG_WDTCONFIG0_REG(0), TIMG_WDT_FLASHBOOT_MOD_EN);
     REG_CLR_BIT(RTC_CNTL_WDTCONFIG0_REG, RTC_CNTL_WDT_FLASHBOOT_MOD_EN);
 #if !CONFIG_FREERTOS_UNICORE
     // Wait for FreeRTOS initialization to finish on APP CPU, before replacing its startup stack
