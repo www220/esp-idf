@@ -573,6 +573,12 @@ typedef struct {
     tBTM_BLE_REF_VALUE             ref_value;
 } tBTM_BLE_BATCH_SCAN_CB;
 
+/// Ble scan duplicate type
+enum {
+    BTM_BLE_SCAN_DUPLICATE_DISABLE           = 0x0,  /*!< the Link Layer should generate advertising reports to the host for each packet received */
+    BTM_BLE_SCAN_DUPLICATE_ENABLE            = 0x1,  /*!< the Link Layer should filter out duplicate advertising reports to the Host */
+    BTM_BLE_SCAN_DUPLICATE_MAX               = 0x2,  /*!< 0x02 – 0xFF, Reserved for future use */
+};
 /* filter selection bit index  */
 #define BTM_BLE_PF_ADDR_FILTER          0
 #define BTM_BLE_PF_SRVC_DATA            1
@@ -1050,6 +1056,7 @@ void BTM_BleSetScanParams(tGATT_IF client_if, UINT32 scan_interval,
 **                  scan_window - Scan window
 **                  scan_type - Scan type
 **                  addr_type_own - owner address type
+**                  scan_duplicate_filter - scan duplicate filter
 **                  scan_filter_policy - scan filter policy
 **                  scan_setup_status_cback - Scan setup status callback
 **
@@ -1057,7 +1064,7 @@ void BTM_BleSetScanParams(tGATT_IF client_if, UINT32 scan_interval,
 **
 *******************************************************************************/
 void BTM_BleSetScanFilterParams(tGATT_IF client_if, UINT32 scan_interval, UINT32 scan_window,
-                                tBLE_SCAN_MODE scan_mode, UINT8 addr_type_own, tBTM_BLE_SFP scan_filter_policy,
+                                tBLE_SCAN_MODE scan_mode, UINT8 addr_type_own, UINT8 scan_duplicate_filter, tBTM_BLE_SFP scan_filter_policy,
                                 tBLE_SCAN_PARAM_SETUP_CBACK scan_setup_status_cback);
 
 

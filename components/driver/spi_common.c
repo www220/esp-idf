@@ -329,6 +329,7 @@ void spicommon_cs_initialize(spi_host_device_t host, int cs_io_num, int cs_num, 
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[cs_io_num], 1);
     } else {
         //Use GPIO matrix
+        gpio_set_direction(cs_io_num, GPIO_MODE_INPUT_OUTPUT);
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[cs_io_num], PIN_FUNC_GPIO);
         gpio_matrix_out(cs_io_num, io_signal[host].spics_out[cs_num], false, false);
         if (cs_num == 0) gpio_matrix_in(cs_io_num, io_signal[host].spics_in, false);
@@ -344,7 +345,7 @@ void spicommon_cs_free(spi_host_device_t host, int cs_io_num)
 }
 
 //Set up a list of dma descriptors. dmadesc is an array of descriptors. Data is the buffer to point to.
-void spicommon_setup_dma_desc_links(lldesc_t *dmadesc, int len, const uint8_t *data, bool isrx)
+void IRAM_ATTR spicommon_setup_dma_desc_links(lldesc_t *dmadesc, int len, const uint8_t *data, bool isrx)
 {
     int n = 0;
     while (len) {
@@ -369,6 +370,26 @@ void spicommon_setup_dma_desc_links(lldesc_t *dmadesc, int len, const uint8_t *d
     }
     dmadesc[n - 1].eof = 1; //Mark last DMA desc as end of stream.
     dmadesc[n - 1].qe.stqe_next = NULL;
+}
+
+void spicommon_freeze_cs(spi_host_device_t host)
+{
+    gpio_matrix_in(0x38, io_signal[host].spics_in, false);
+}
+
+static void IOMUX_IN(uint32_t gpio, uint32_t signal_idx)
+{
+    GPIO.func_in_sel_cfg[signal_idx].sig_in_sel = 0;
+    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[gpio]);
+}
+
+void spicommon_restore_cs(spi_host_device_t host, int cs_io_num, bool iomux)
+{
+    if (iomux) {
+        IOMUX_IN(cs_io_num, io_signal[host].spics_in);
+    } else {
+        gpio_matrix_in(cs_io_num, io_signal[host].spics_in, false);
+    }
 }
 
 
