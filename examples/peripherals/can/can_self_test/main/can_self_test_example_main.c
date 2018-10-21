@@ -77,7 +77,7 @@ static void can_receive_task(void *arg)
         xSemaphoreTake(rx_sem, portMAX_DELAY);
         for (int i = 0; i < NO_OF_MSGS; i++) {
             //Receive message and print message data
-            ESP_ERROR_CHECK(can_receive(&rx_message, portMAX_DELAY))
+            ESP_ERROR_CHECK(can_receive(&rx_message, portMAX_DELAY));
             ESP_LOGI(EXAMPLE_TAG, "Msg received - Data = %d", rx_message.data[0]);
         }
         //Indicate to control task all messages received for this iteration
@@ -120,7 +120,7 @@ void app_main()
     xTaskCreatePinnedToCore(can_transmit_task, "CAN_tx", 4096, NULL, TX_TASK_PRIO, NULL, tskNO_AFFINITY);
 
     //Install CAN driver
-    ESP_ERROR_CHECK(can_driver_install(&g_config, & t_config, &f_config));
+    ESP_ERROR_CHECK(can_driver_install(&g_config, &t_config, &f_config));
     ESP_LOGI(EXAMPLE_TAG, "Driver installed");
 
     //Start control task

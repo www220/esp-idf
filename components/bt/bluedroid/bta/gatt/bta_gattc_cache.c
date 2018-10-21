@@ -1291,7 +1291,9 @@ void bta_gattc_get_db_with_opration(UINT16 conn_id,
     tBTA_GATTC_CLCB *p_clcb = bta_gattc_find_clcb_by_conn_id(conn_id);
 
     if (p_clcb == NULL) {
-        return NULL;
+        *count = 0;
+        *char_db = NULL;
+        return;
     }
 
     tBTA_GATTC_SERV *p_srcb = p_clcb->p_srcb;
@@ -1671,7 +1673,8 @@ void bta_gattc_get_db_size_with_type_handle(UINT16 conn_id, bt_gatt_db_attribute
     tBTA_GATTC_CLCB *p_clcb = bta_gattc_find_clcb_by_conn_id(conn_id);
 
     if (p_clcb == NULL) {
-        return NULL;
+        *count = 0;
+        return;
     }
     
     tBTA_GATTC_SERV *p_srcb = p_clcb->p_srcb;
@@ -2113,7 +2116,7 @@ bool bta_gattc_cache_load(tBTA_GATTC_CLCB *p_clcb)
         APPL_TRACE_DEBUG("%s(), gattc cache load fail, status = %x", __func__, status);
         return false;
     }
-
+    p_clcb->searched_service_source = BTA_GATTC_SERVICE_INFO_FROM_NVS_FLASH;
     bta_gattc_rebuild_cache(p_clcb->p_srcb, num_attr, attr);
     //free the attr buffer after used.
     osi_free(attr);

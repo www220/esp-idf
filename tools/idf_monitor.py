@@ -3,8 +3,8 @@
 # esp-idf serial output monitor tool. Does some helpful things:
 # - Looks up hex addresses in ELF file with addr2line
 # - Reset ESP32 via serial RTS line (Ctrl-T Ctrl-R)
-# - Run "make flash" (Ctrl-T Ctrl-F)
-# - Run "make app-flash" (Ctrl-T Ctrl-A)
+# - Run "make (or idf.py) flash" (Ctrl-T Ctrl-F)
+# - Run "make (or idf.py) app-flash" (Ctrl-T Ctrl-A)
 # - If gdbstub output is detected, gdb is automatically loaded
 #
 # Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
@@ -28,6 +28,12 @@
 # Originally released under BSD-3-Clause license.
 #
 from __future__ import print_function, division
+from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import chr
+from builtins import object
+from builtins import bytes
 import subprocess
 import argparse
 import codecs
@@ -37,6 +43,7 @@ try:
     import queue
 except ImportError:
     import Queue as queue
+import shlex
 import time
 import sys
 import serial
@@ -223,7 +230,7 @@ class SerialReader(StoppableThread):
             except:
                 pass
 
-class LineMatcher:
+class LineMatcher(object):
     """
     Assembles a dictionary of filtering rules based on the --print_filter
     argument of idf_monitor. Then later it is used to match lines and
@@ -295,7 +302,7 @@ class Monitor(object):
         self.event_queue = queue.Queue()
         self.console = miniterm.Console()
         if os.name == 'nt':
-            sys.stderr = ANSIColorConverter(sys.stderr)
+            sys.stderr = ANSIColorConverter(sys.stderr, decode_output=True)
             self.console.output = ANSIColorConverter(self.console.output)
             self.console.byte_output = ANSIColorConverter(self.console.byte_output)
 
@@ -303,8 +310,8 @@ class Monitor(object):
             # Use Console.getkey implementation from 3.3.0 (to be in sync with the ConsoleReader._cancel patch above)
             def getkey_patched(self):
                 c = self.enc_stdin.read(1)
-                if c == unichr(0x7f):
-                    c = unichr(8)    # map the BS key (which yields DEL) to backspace
+                if c == chr(0x7f):
+                    c = chr(8)    # map the BS key (which yields DEL) to backspace
                 return c
 
             self.console.getkey = types.MethodType(getkey_patched, self.console)
@@ -314,15 +321,18 @@ class Monitor(object):
         self.console_reader = ConsoleReader(self.console, self.event_queue, socket_mode)
         self.serial_reader = SerialReader(self.serial, self.event_queue)
         self.elf_file = elf_file
-        self.make = make
+        if not os.path.exists(make):
+            self.make = shlex.split(make)  # allow for possibility the "make" arg is a list of arguments (for idf.py)
+        else:
+            self.make = make
         self.toolchain_prefix = toolchain_prefix
         self.menu_key = CTRL_T
         self.exit_key = CTRL_RBRACKET
 
         self.translate_eol = {
-            "CRLF": lambda c: c.replace(b"\n", b"\r\n"),
-            "CR":   lambda c: c.replace(b"\n", b"\r"),
-            "LF":   lambda c: c.replace(b"\r", b"\n"),
+            "CRLF": lambda c: c.replace("\n", "\r\n"),
+            "CR":   lambda c: c.replace("\n", "\r"),
+            "LF":   lambda c: c.replace("\r", "\n"),
         }[eol]
 
         # internal state
@@ -404,9 +414,9 @@ class Monitor(object):
             self._last_line_part = sp.pop()
         for line in sp:
             if line != b"":
-                if self._serial_check_exit and line == self.exit_key:
+                if self._serial_check_exit and line == self.exit_key.encode('latin-1'):
                     raise SerialStopException()
-                if self._output_enabled and (self._force_line_print or self._line_matcher.match(line)):
+                if self._output_enabled and (self._force_line_print or self._line_matcher.match(line.decode(errors="ignore"))):
                     self.console.write_bytes(line + b'\n')
                     self.handle_possible_pc_address_in_line(line)
                 self.check_gdbstub_trigger(line)
@@ -416,7 +426,7 @@ class Monitor(object):
         # of the line. But after some time when we didn't received it we need
         # to make a decision.
         if self._last_line_part != b"":
-            if self._force_line_print or (finalize_line and self._line_matcher.match(self._last_line_part)):
+            if self._force_line_print or (finalize_line and self._line_matcher.match(self._last_line_part.decode(errors="ignore"))):
                 self._force_line_print = True;
                 if self._output_enabled:
                     self.console.write_bytes(self._last_line_part)
@@ -438,7 +448,7 @@ class Monitor(object):
     def handle_possible_pc_address_in_line(self, line):
         line = self._pc_address_buffer + line
         self._pc_address_buffer = b""
-        for m in re.finditer(MATCH_PCADDR, line):
+        for m in re.finditer(MATCH_PCADDR, line.decode(errors="ignore")):
             self.lookup_pc_address(m.group())
 
     def handle_menu_key(self, c):
@@ -481,19 +491,18 @@ class Monitor(object):
 ---    {menu:7} Send the menu character itself to remote
 ---    {exit:7} Send the exit character itself to remote
 ---    {reset:7} Reset target board via RTS line
----    {make:7} Run 'make flash' to build & flash
----    {appmake:7} Run 'make app-flash to build & flash app
+---    {makecmd:7} Build & flash project
+---    {appmake:7} Build & flash app only
 ---    {output:7} Toggle output display
 ---    {pause:7} Reset target into bootloader to pause app via RTS line
 """.format(version=__version__,
            exit=key_description(self.exit_key),
            menu=key_description(self.menu_key),
            reset=key_description(CTRL_R),
-           make=key_description(CTRL_F),
+           makecmd=key_description(CTRL_F),
            appmake=key_description(CTRL_A),
            output=key_description(CTRL_Y),
-           pause=key_description(CTRL_P),
-           )
+           pause=key_description(CTRL_P) )
 
     def __enter__(self):
         """ Use 'with self' to temporarily disable monitoring behaviour """
@@ -511,12 +520,12 @@ class Monitor(object):
             red_print("""
 --- {}
 --- Press {} to exit monitor.
---- Press {} to run 'make flash'.
---- Press {} to run 'make app-flash'.
+--- Press {} to build & flash project.
+--- Press {} to build & flash app.
 --- Press any other key to resume monitor (resets target).""".format(reason,
                                                                      key_description(self.exit_key),
                                                                      key_description(CTRL_F),
-                                                                     key_description(CTRL_A)))
+                                                                     key_description(CTRL_A) ))
             k = CTRL_T  # ignore CTRL-T here, so people can muscle-memory Ctrl-T Ctrl-F, etc.
             while k == CTRL_T:
                 k = self.console.getkey()
@@ -530,9 +539,12 @@ class Monitor(object):
 
     def run_make(self, target):
         with self:
-            yellow_print("Running make %s..." % target)
-            p = subprocess.Popen([self.make,
-                                  target ])
+            if isinstance(self.make, list):
+                popen_args = self.make + [ target ]
+            else:
+                popen_args = [ self.make, target ]
+            yellow_print("Running %s..." % " ".join(popen_args))
+            p = subprocess.Popen(popen_args)
             try:
                 p.wait()
             except KeyboardInterrupt:
@@ -547,8 +559,8 @@ class Monitor(object):
             ["%saddr2line" % self.toolchain_prefix,
              "-pfiaC", "-e", self.elf_file, pc_addr],
             cwd=".")
-        if not "?? ??:0" in translation:
-            yellow_print(translation)
+        if not b"?? ??:0" in translation:
+            yellow_print(translation.decode())
 
     def check_gdbstub_trigger(self, line):
         line = self._gdb_buffer + line
@@ -556,7 +568,7 @@ class Monitor(object):
         m = re.search(b"\\$(T..)#(..)", line) # look for a gdb "reason" for a break
         if m is not None:
             try:
-                chsum = sum(ord(p) for p in m.group(1)) & 0xFF
+                chsum = sum(ord(bytes([p])) for p in m.group(1)) & 0xFF
                 calc_chsum = int(m.group(2), 16)
             except ValueError:
                 return  # payload wasn't valid hex digits
@@ -708,14 +720,18 @@ if os.name == 'nt':
         least-bad working solution, as winpty doesn't support any "passthrough" mode for raw output.
         """
 
-        def __init__(self, output):
+        def __init__(self, output=None, decode_output=False):
             self.output = output
+            self.decode_output = decode_output
             self.handle = GetStdHandle(STD_ERROR_HANDLE if self.output == sys.stderr else STD_OUTPUT_HANDLE)
             self.matched = b''
 
         def _output_write(self, data):
             try:
-                self.output.write(data)
+                if self.decode_output:
+                    self.output.write(data.decode())
+                else:
+                    self.output.write(data)
             except IOError:
                 # Windows 10 bug since the Fall Creators Update, sometimes writing to console randomly throws
                 # an exception (however, the character is still written to the screen)
@@ -723,13 +739,20 @@ if os.name == 'nt':
                 pass
 
         def write(self, data):
+            if isinstance(data, bytes):
+                data = bytearray(data)
+            else:
+                data = bytearray(data, 'utf-8')
             for b in data:
+                b = bytes([b])
                 l = len(self.matched)
-                if b == '\033':  # ESC
+                if b == b'\033':  # ESC
                     self.matched = b
-                elif (l == 1 and b == '[') or (1 < l < 7):
+                elif (l == 1 and b == b'[') or (1 < l < 7):
                     self.matched += b
-                    if self.matched == ANSI_NORMAL:  # reset console
+                    if self.matched == ANSI_NORMAL.encode('latin-1'):  # reset console
+                        # Flush is required only with Python3 - switching color before it is printed would mess up the console
+                        self.flush()
                         SetConsoleTextAttribute(self.handle, FOREGROUND_GREY)
                         self.matched = b''
                     elif len(self.matched) == 7:     # could be an ANSI sequence
@@ -738,6 +761,8 @@ if os.name == 'nt':
                             color = ANSI_TO_WINDOWS_COLOR[int(m.group(2))]
                             if m.group(1) == b'1':
                                 color |= FOREGROUND_INTENSITY
+                            # Flush is required only with Python3 - switching color before it is printed would mess up the console
+                            self.flush()
                             SetConsoleTextAttribute(self.handle, color)
                         else:
                             self._output_write(self.matched) # not an ANSI color code, display verbatim
@@ -748,7 +773,6 @@ if os.name == 'nt':
 
         def flush(self):
             self.output.flush()
-
 
 if __name__ == "__main__":
     main()

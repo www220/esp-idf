@@ -1,6 +1,6 @@
 # Espressif IoT Development Framework
 
-[![alt text](https://readthedocs.org/projects/docs/badge/?version=latest "Documentation Status")](https://docs.espressif.com/projects/esp-idf/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.com/projects/espressif-esp-idf/badge/?version=latest)](https://docs.espressif.com/projects/esp-idf/en/latest/?badge=latest)
 
 ESP-IDF is the official development framework for the [ESP32](https://espressif.com/en/products/hardware/esp32/overview) chip.
 
@@ -49,7 +49,7 @@ NOTE: The `-j4` option causes `make` to run 4 parallel jobs. This is much faster
 
 ## Flashing the Project
 
-When `make all` finishes, it will print a command line to use esptool.py to flash the chip. However you can also do this from make by running:
+When the build finishes, it will print a command line to use esptool.py to flash the chip. However you can also do this automatically by running:
 
 `make -j4 flash`
 
@@ -87,6 +87,7 @@ Multiple make functions can be combined into one. For example: to build the app 
 ```
 make -j5 flash monitor
 ```
+
 
 ## The Partition Table
 

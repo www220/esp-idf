@@ -23,6 +23,7 @@
 #include "freertos/ringbuf.h"
 #include "soc/gpio_periph.h"
 #include "sdkconfig.h"
+#include "unity_config.h"
 
 const static char TAG[] = "test_spi";
 
@@ -234,6 +235,10 @@ TEST_CASE("SPI Master test", "[spi]")
     success &= spi_test(handle, 4); //aligned
     success &= spi_test(handle, 16); //small
     success &= spi_test(handle, 21); //small, unaligned
+    success &= spi_test(handle, 32); //small
+    success &= spi_test(handle, 47); //small, unaligned
+    success &= spi_test(handle, 63); //small
+    success &= spi_test(handle, 64); //small, unaligned
 
     destroy_spi_bus(handle);
 
@@ -575,7 +580,7 @@ TEST_CASE("SPI Master DMA test, TX and RX in different regions", "[spi]")
     ESP_LOGI(TAG, "iram: %p, dram: %p", data_iram, data_dram);
     ESP_LOGI(TAG, "drom: %p, malloc: %p", data_drom, data_malloc);
 
-    memset(trans, 0, 6*sizeof(spi_transaction_t));
+    memset(trans, 0, sizeof(trans));
 
     trans[0].length = 320*8,
     trans[0].tx_buffer = data_iram;
@@ -693,8 +698,22 @@ TEST_CASE("SPI Master DMA test: length, start, not aligned", "[spi]")
 
 static const char MASTER_TAG[] = "test_master";
 static const char SLAVE_TAG[] = "test_slave";
-DRAM_ATTR static uint8_t master_send[] = {0x93, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xaa, 0xcc, 0xff, 0xee, 0x55, 0x77, 0x88, 0x43};
-DRAM_ATTR static uint8_t slave_send[] = { 0xaa, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10, 0x13, 0x57, 0x9b, 0xdf, 0x24, 0x68, 0xac, 0xe0 };
+DRAM_ATTR static uint8_t master_send[] = {
+    0x93, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xaa, 0xcc, 0xff, 0xee, 0x55, 0x77, 0x88, 0x43,
+    0x74,
+    0x93, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xaa, 0xcc, 0xff, 0xee, 0x55, 0x77, 0x88, 0x43,
+    0x74,
+    0x93, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xaa, 0xcc, 0xff, 0xee, 0x55, 0x77, 0x88, 0x43,
+    0x74,
+    };
+DRAM_ATTR static uint8_t slave_send[] = {
+    0xaa, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10, 0x13, 0x57, 0x9b, 0xdf, 0x24, 0x68, 0xac, 0xe0,
+    0xda,
+    0xaa, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10, 0x13, 0x57, 0x9b, 0xdf, 0x24, 0x68, 0xac, 0xe0,
+    0xda,
+    0xaa, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10, 0x13, 0x57, 0x9b, 0xdf, 0x24, 0x68, 0xac, 0xe0,
+    0xda,
+    };
 
 
 static void master_deinit(spi_device_handle_t spi)
@@ -781,6 +800,7 @@ static void task_slave(void* arg)
         t.tx_buffer = txdata.start;
         t.rx_buffer = recvbuf+8;
         //loop until trans_len != 0 to skip glitches
+        memset(recvbuf, 0x66, sizeof(recvbuf));
         do {
             TEST_ESP_OK( spi_slave_transmit( context->spi, &t, portMAX_DELAY ) );
         } while ( t.trans_len == 0 );
@@ -791,26 +811,134 @@ static void task_slave(void* arg)
     }
 }
 
-TEST_CASE("SPI master variable cmd & addr test","[spi]")
+#define TEST_SPI_HOST   HSPI_HOST
+#define TEST_SLAVE_HOST VSPI_HOST
+
+static uint8_t bitswap(uint8_t in)
 {
-    uint8_t *tx_buf=master_send;
-    uint8_t rx_buf[320];
-    uint8_t *rx_buf_ptr = rx_buf;
+    uint8_t out = 0;
+    for (int i = 0; i < 8; i++) {
+        out = out >> 1;
+        if (in&0x80) out |= 0x80;
+        in = in << 1;
+    }
+    return out;
+}
 
-    spi_slave_task_context_t slave_context = {};
-    esp_err_t err = init_slave_context( &slave_context );
-    TEST_ASSERT( err == ESP_OK );
-
+void test_cmd_addr(spi_slave_task_context_t *slave_context, bool lsb_first)
+{
     spi_device_handle_t spi;
+
+    ESP_LOGI(MASTER_TAG, ">>>>>>>>> TEST %s FIRST <<<<<<<<<<<", lsb_first?"LSB":"MSB");
 
     //initial master, mode 0, 1MHz
     spi_bus_config_t buscfg=SPI_BUS_TEST_DEFAULT_CONFIG();
-    TEST_ESP_OK(spi_bus_initialize(HSPI_HOST, &buscfg, 1));
+    TEST_ESP_OK(spi_bus_initialize(TEST_SPI_HOST, &buscfg, 1));
     spi_device_interface_config_t devcfg=SPI_DEVICE_TEST_DEFAULT_CONFIG();
-    devcfg.clock_speed_hz = 1*1000*1000;  //currently only up to 4MHz for internel connect
-    devcfg.mode = 0;
-    devcfg.cs_ena_posttrans = 2;
-    TEST_ESP_OK(spi_bus_add_device(HSPI_HOST, &devcfg, &spi));
+    devcfg.clock_speed_hz = 1*1000*1000;
+    if (lsb_first) devcfg.flags |= SPI_DEVICE_BIT_LSBFIRST;
+    TEST_ESP_OK(spi_bus_add_device(TEST_SPI_HOST, &devcfg, &spi));
+
+    //connecting pins to two peripherals breaks the output, fix it.
+    gpio_output_sel(buscfg.mosi_io_num, FUNC_GPIO, spi_periph_signal[TEST_SPI_HOST].spid_out);
+    gpio_output_sel(buscfg.miso_io_num, FUNC_GPIO, spi_periph_signal[TEST_SLAVE_HOST].spiq_out);
+    gpio_output_sel(devcfg.spics_io_num, FUNC_GPIO, spi_periph_signal[TEST_SPI_HOST].spics_out[0]);
+    gpio_output_sel(buscfg.sclk_io_num, FUNC_GPIO, spi_periph_signal[TEST_SPI_HOST].spiclk_out);
+
+    for (int i= 0; i < 8; i++) {
+        //prepare slave tx data
+        slave_txdata_t slave_txdata = (slave_txdata_t) {
+            .start = slave_send,
+            .len = 256,
+        };
+        xQueueSend(slave_context->data_to_send, &slave_txdata, portMAX_DELAY);
+
+        vTaskDelay(50);
+        //prepare master tx data
+        int cmd_bits = (i+1)*2;
+        int addr_bits = 56-8*i;
+        int round_up = (cmd_bits+addr_bits+7)/8*8;
+        addr_bits = round_up - cmd_bits;
+
+        spi_transaction_ext_t trans = (spi_transaction_ext_t) {
+            .base = {
+                .flags = SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR,
+                .addr = 0x456789abcdef0123,
+                .cmd = 0xcdef,
+            },
+            .command_bits = cmd_bits,
+            .address_bits = addr_bits,
+        };
+
+        ESP_LOGI( MASTER_TAG, "===== test%d =====", i );
+        ESP_LOGI(MASTER_TAG, "cmd_bits： %d, addr_bits: %d", cmd_bits, addr_bits);
+        TEST_ESP_OK(spi_device_transmit(spi, (spi_transaction_t*)&trans));
+        //wait for both master and slave end
+
+        size_t rcv_len;
+        slave_rxdata_t *rcv_data = xRingbufferReceive(slave_context->data_received, &rcv_len, portMAX_DELAY);
+        rcv_len-=8;
+        uint8_t *buffer = rcv_data->data;
+
+        ESP_LOGI(SLAVE_TAG, "trans_len: %d", rcv_len);
+        TEST_ASSERT_EQUAL(rcv_len, (rcv_data->len+7)/8);
+        TEST_ASSERT_EQUAL(rcv_data->len, cmd_bits+addr_bits);
+        ESP_LOG_BUFFER_HEX("slave rx", buffer, rcv_len);
+
+        uint16_t cmd_expected = trans.base.cmd & (BIT(cmd_bits) - 1);
+        uint64_t addr_expected = trans.base.addr & ((1ULL<<addr_bits) - 1);
+
+        uint8_t *data_ptr = buffer;
+        uint16_t cmd_got = *(uint16_t*)data_ptr;
+        data_ptr += cmd_bits/8;
+        cmd_got = __builtin_bswap16(cmd_got);
+        cmd_got = cmd_got >> (16-cmd_bits);
+        int remain_bits = cmd_bits % 8;
+
+        uint64_t addr_got = *(uint64_t*)data_ptr;
+        data_ptr += 8;
+        addr_got = __builtin_bswap64(addr_got);
+        addr_got = (addr_got << remain_bits);
+        addr_got |= (*data_ptr >> (8-remain_bits));
+        addr_got = addr_got >> (64-addr_bits);
+
+        if (lsb_first) {
+            cmd_got = __builtin_bswap16(cmd_got);
+            addr_got = __builtin_bswap64(addr_got);
+
+            uint8_t *swap_ptr = (uint8_t*)&cmd_got;
+            swap_ptr[0] = bitswap(swap_ptr[0]);
+            swap_ptr[1] = bitswap(swap_ptr[1]);
+            cmd_got = cmd_got >> (16-cmd_bits);
+
+            swap_ptr = (uint8_t*)&addr_got;
+            for (int j = 0; j < 8; j++) swap_ptr[j] = bitswap(swap_ptr[j]);
+            addr_got = addr_got >> (64-addr_bits);
+        }
+
+        ESP_LOGI(SLAVE_TAG, "cmd_got: %04X, addr_got: %08X%08X", cmd_got, (uint32_t)(addr_got>>32), (uint32_t)addr_got);
+
+        TEST_ASSERT_EQUAL_HEX16(cmd_expected, cmd_got);
+        if (addr_bits > 0) {
+            TEST_ASSERT_EQUAL_HEX32(addr_expected, addr_got);
+            TEST_ASSERT_EQUAL_HEX32(addr_expected >> 8, addr_got >> 8);
+        }
+
+        //clean
+        vRingbufferReturnItem(slave_context->data_received, buffer);
+    }
+
+    TEST_ASSERT(spi_bus_remove_device(spi) == ESP_OK);
+    TEST_ASSERT(spi_bus_free(TEST_SPI_HOST) == ESP_OK);
+}
+
+TEST_CASE("SPI master variable cmd & addr test","[spi]")
+{
+    spi_slave_task_context_t slave_context = {};
+    esp_err_t err = init_slave_context( &slave_context );
+    TEST_ASSERT( err == ESP_OK );
+    TaskHandle_t handle_slave;
+    xTaskCreate( task_slave, "spi_slave", 4096, &slave_context, 0, &handle_slave);
 
     //initial slave, mode 0, no dma
     int dma_chan = 0;
@@ -818,111 +946,22 @@ TEST_CASE("SPI master variable cmd & addr test","[spi]")
     spi_bus_config_t slv_buscfg=SPI_BUS_TEST_DEFAULT_CONFIG();
     spi_slave_interface_config_t slvcfg=SPI_SLAVE_TEST_DEFAULT_CONFIG();
     slvcfg.mode = slave_mode;
-    //Enable pull-ups on SPI lines so we don't detect rogue pulses when no master is connected.
-    slave_pull_up(&buscfg, slvcfg.spics_io_num);
     //Initialize SPI slave interface
-    TEST_ESP_OK( spi_slave_initialize(VSPI_HOST, &slv_buscfg, &slvcfg, dma_chan) );
+    TEST_ESP_OK( spi_slave_initialize(TEST_SLAVE_HOST, &slv_buscfg, &slvcfg, dma_chan) );
 
-
-    //connecting pins to two peripherals breaks the output, fix it.
-    gpio_output_sel(PIN_NUM_MOSI, FUNC_GPIO, HSPID_OUT_IDX);
-    gpio_output_sel(PIN_NUM_MISO, FUNC_GPIO, VSPIQ_OUT_IDX);
-    gpio_output_sel(PIN_NUM_CS, FUNC_GPIO, HSPICS0_OUT_IDX);
-    gpio_output_sel(PIN_NUM_CLK, FUNC_GPIO, HSPICLK_OUT_IDX);
-
-    TaskHandle_t handle_slave;
-    xTaskCreate( task_slave, "spi_slave", 4096, &slave_context, 0, &handle_slave);
-
-    slave_txdata_t slave_txdata[16];
-    spi_transaction_ext_t trans[16];
-    for( int i= 0; i < 16; i ++ ) {
-        //prepare slave tx data
-        slave_txdata[i] = (slave_txdata_t) {
-            .start = slave_send + 4*(i%3),
-            .len = 256,
-        };
-        xQueueSend( slave_context.data_to_send, &slave_txdata[i], portMAX_DELAY );
-        //prepare master tx data
-        trans[i] = (spi_transaction_ext_t) {
-            .base = {
-                .flags = SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR,
-                .addr = 0x456789ab,
-                .cmd = 0xcdef,
-
-                .length = 8*i,
-                .tx_buffer = tx_buf+i,
-                .rx_buffer = rx_buf_ptr,
-            },
-            .command_bits = ((i+1)%3) * 8,
-            .address_bits = ((i/3)%5) * 8,
-        };
-        if ( trans[i].base.length == 0 ) {
-            trans[i].base.tx_buffer = NULL;
-            trans[i].base.rx_buffer = NULL;
-        } else  {
-            rx_buf_ptr += (trans[i].base.length + 31)/32*4;
-        }
-    }
-
-    vTaskDelay(10);
-
-    for ( int i = 0; i < 16; i ++ ) {
-        TEST_ESP_OK (spi_device_queue_trans( spi, (spi_transaction_t*)&trans[i], portMAX_DELAY ) );
-        vTaskDelay(10);
-    }
-
-    for( int i= 0; i < 16; i ++ ) {
-        //wait for both master and slave end
-        ESP_LOGI( MASTER_TAG, "===== test%d =====", i );
-        spi_transaction_ext_t *t;
-        size_t rcv_len;
-        spi_device_get_trans_result( spi, (spi_transaction_t**)&t, portMAX_DELAY );
-        TEST_ASSERT( t == &trans[i] );
-        if ( trans[i].base.length != 0 ) {
-            ESP_LOG_BUFFER_HEX( "master tx", trans[i].base.tx_buffer, trans[i].base.length/8 );
-            ESP_LOG_BUFFER_HEX( "master rx", trans[i].base.rx_buffer, trans[i].base.length/8 );
-        } else {
-            ESP_LOGI( "master tx", "no data" );
-            ESP_LOGI( "master rx", "no data" );
-        }
-
-        slave_rxdata_t *rcv_data = xRingbufferReceive( slave_context.data_received, &rcv_len, portMAX_DELAY );
-        uint8_t *buffer = rcv_data->data;
-        rcv_len = rcv_data->len;
-        ESP_LOGI(SLAVE_TAG, "trans_len: %d", rcv_len);
-        ESP_LOG_BUFFER_HEX( "slave tx", slave_txdata[i].start, (rcv_len+7)/8);
-        ESP_LOG_BUFFER_HEX( "slave rx", buffer, (rcv_len+7)/8);
-        //check result
-        uint8_t *ptr_addr = (uint8_t*)&t->base.addr;
-        uint8_t *ptr_cmd = (uint8_t*)&t->base.cmd;
-        for ( int j = 0; j < t->command_bits/8; j ++ ) {
-            TEST_ASSERT_EQUAL( buffer[j], ptr_cmd[t->command_bits/8-j-1] );
-        }
-        for ( int j = 0; j < t->address_bits/8; j ++ ) {
-            TEST_ASSERT_EQUAL( buffer[t->command_bits/8+j], ptr_addr[t->address_bits/8-j-1] );
-        }
-        if ( t->base.length != 0) {
-            TEST_ASSERT_EQUAL_HEX8_ARRAY(t->base.tx_buffer, buffer + (t->command_bits + t->address_bits)/8, t->base.length/8);
-            TEST_ASSERT_EQUAL_HEX8_ARRAY(slave_txdata[i].start + (t->command_bits + t->address_bits)/8, t->base.rx_buffer, t->base.length/8);
-        }
-        TEST_ASSERT_EQUAL( t->base.length + t->command_bits + t->address_bits, rcv_len );
-
-        //clean
-        vRingbufferReturnItem( slave_context.data_received, buffer );
-    }
+    test_cmd_addr(&slave_context, false);
+    test_cmd_addr(&slave_context, true);
 
     vTaskDelete( handle_slave );
     handle_slave = 0;
 
     deinit_slave_context(&slave_context);
 
-    TEST_ASSERT(spi_slave_free(VSPI_HOST) == ESP_OK);
-
-    TEST_ASSERT(spi_bus_remove_device(spi) == ESP_OK);
-    TEST_ASSERT(spi_bus_free(HSPI_HOST) == ESP_OK);
+    TEST_ASSERT(spi_slave_free(TEST_SLAVE_HOST) == ESP_OK);
 
     ESP_LOGI(MASTER_TAG, "test passed.");
 }
+
 /********************************************************************************
  *      Test Timing By Internal Connections
  ********************************************************************************/
@@ -1006,6 +1045,8 @@ esp_err_t check_data(spi_transaction_t *t, spi_dup_t dup, slave_rxdata_t *slave_
     return ESP_OK;
 }
 
+int test_len[] = {1, 3, 5, 7, 9, 11, 33, 64};
+
 static void timing_init_transactions(spi_dup_t dup, timing_context_t* context)
 {
     spi_transaction_t* trans = context->master_trans;
@@ -1014,7 +1055,7 @@ static void timing_init_transactions(spi_dup_t dup, timing_context_t* context)
         for (int i = 0; i < 8; i++ ) {
             trans[i] = (spi_transaction_t) {
                 .flags = 0,
-                .rxlength = 8*(i*2+1),
+                .rxlength = 8*test_len[i],
                 .rx_buffer = rx_buf_ptr,
             };
             rx_buf_ptr += ((context->master_trans[i].rxlength + 31)/8)&(~3);
@@ -1023,7 +1064,7 @@ static void timing_init_transactions(spi_dup_t dup, timing_context_t* context)
         for (int i = 0; i < 8; i++ ) {
             trans[i] = (spi_transaction_t) {
                 .flags = 0,
-                .length = 8*(i*2+1),
+                .length = 8*test_len[i],
                 .tx_buffer = master_send+i,
             };
         }
@@ -1031,7 +1072,7 @@ static void timing_init_transactions(spi_dup_t dup, timing_context_t* context)
         for (int i = 0; i < 8; i++ ) {
             trans[i] = (spi_transaction_t) {
                 .flags = 0,
-                .length = 8*(i*2+1),
+                .length = 8*test_len[i],
                 .tx_buffer = master_send+i,
                 .rx_buffer = rx_buf_ptr,
             };
@@ -1042,7 +1083,7 @@ static void timing_init_transactions(spi_dup_t dup, timing_context_t* context)
     for (int i = 0; i < 8; i ++) {
         context->slave_trans[i] = (slave_txdata_t) {
             .start = slave_send + 4*(i%3),
-            .len = 256,
+            .len = 512,
         };
     }
 }
@@ -1073,7 +1114,7 @@ typedef struct {
 #define ESP_SPI_SLAVE_MAX_FREQ_SYNC SPI_MASTER_FREQ_40M
 
 
-static test_timing_config_t timing_master_conf_t[] = {/**/
+static test_timing_config_t timing_master_conf_t[] = {
     { .cfg_name = "FULL_DUP, MASTER IOMUX",
       .freq_limit = SPI_MASTER_FREQ_13M,
       .dup = FULL_DUPLEX,
@@ -1315,6 +1356,7 @@ TEST_CASE("spi_speed","[spi]")
     uint32_t t_flight;
     //to get rid of the influence of randomly interrupts, we measured the performance by median value
     uint32_t t_flight_sorted[TEST_TIMES];
+    esp_err_t ret;
     int t_flight_num = 0;
 
     spi_device_handle_t spi;
@@ -1326,9 +1368,6 @@ TEST_CASE("spi_speed","[spi]")
 
     //first work with DMA
     speed_setup(&spi, use_dma);
-
-    //first time introduces a device switch, which costs more time. we skip this
-    spi_device_transmit(spi, &trans);
 
     //record flight time by isr, with DMA
     t_flight_num = 0;
@@ -1344,15 +1383,34 @@ TEST_CASE("spi_speed","[spi]")
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
 
+    //acquire the bus to send polling transactions faster
+    ret = spi_device_acquire_bus(spi, portMAX_DELAY);
+    TEST_ESP_OK(ret);
+
+    //record flight time by polling and with DMA
+    t_flight_num = 0;
+    for (int i = 0; i < TEST_TIMES; i++) {
+        spi_device_polling_transmit(spi, &trans); // prime the flash cache
+        RECORD_TIME_START();
+        spi_device_polling_transmit(spi, &trans);
+        RECORD_TIME_END(&t_flight);
+        sorted_array_insert(t_flight_sorted, &t_flight_num, t_flight);
+    }
+    TEST_PERFORMANCE_LESS_THAN(SPI_PER_TRANS_POLLING, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+    for (int i = 0; i < TEST_TIMES; i++) {
+        ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
+    }
+
+    //release the bus
+    spi_device_release_bus(spi);
+
     speed_deinit(spi);
     speed_setup(&spi, !use_dma);
-
-    //first time introduces a device switch, which costs more time. we skip this
-    spi_device_transmit(spi, &trans);
 
     //record flight time by isr, without DMA
     t_flight_num = 0;
     for (int i = 0; i < TEST_TIMES; i++) {
+        spi_device_transmit(spi, &trans); // prime the flash cache
         RECORD_TIME_START();
         spi_device_transmit(spi, &trans);
         RECORD_TIME_END(&t_flight);
@@ -1362,6 +1420,165 @@ TEST_CASE("spi_speed","[spi]")
     for (int i = 0; i < TEST_TIMES; i++) {
         ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
     }
+
+    //acquire the bus to send polling transactions faster
+    ret = spi_device_acquire_bus(spi, portMAX_DELAY);
+    TEST_ESP_OK(ret);
+    //record flight time by polling, without DMA
+    t_flight_num = 0;
+    for (int i = 0; i < TEST_TIMES; i++) {
+        spi_device_polling_transmit(spi, &trans); // prime the flash cache
+        RECORD_TIME_START();
+        spi_device_polling_transmit(spi, &trans);
+        RECORD_TIME_END(&t_flight);
+        sorted_array_insert(t_flight_sorted, &t_flight_num, t_flight);
+    }
+    TEST_PERFORMANCE_LESS_THAN(SPI_PER_TRANS_POLLING_NO_DMA, "%d us", t_flight_sorted[(TEST_TIMES+1)/2]);
+    for (int i = 0; i < TEST_TIMES; i++) {
+        ESP_LOGI(TAG, "%d", t_flight_sorted[i]);
+    }
+
+    //release the bus
+    spi_device_release_bus(spi);
     speed_deinit(spi);
 }
 
+typedef struct {
+    spi_device_handle_t handle;
+    bool finished;
+} task_context_t;
+
+void spi_task1(void* arg)
+{
+    //task1 send 50 polling transactions, acquire the bus and send another 50
+    int count=0;
+    spi_transaction_t t = {
+        .flags = SPI_TRANS_USE_TXDATA,
+        .tx_data = { 0x80, 0x12, 0x34, 0x56 },
+        .length = 4*8,
+    };
+    spi_device_handle_t handle = ((task_context_t*)arg)->handle;
+    for( int j = 0; j < 50; j ++ ) {
+        TEST_ESP_OK(spi_device_polling_transmit( handle, &t ));
+        ESP_LOGI( TAG, "task1:%d", count++ );
+    }
+    TEST_ESP_OK(spi_device_acquire_bus( handle, portMAX_DELAY ));
+    for( int j = 0; j < 50; j ++ ) {
+        TEST_ESP_OK(spi_device_polling_transmit( handle, &t ));
+        ESP_LOGI( TAG, "task1:%d", count++ );
+    }
+    spi_device_release_bus(handle);
+    ESP_LOGI(TAG, "task1 terminates");
+    ((task_context_t*)arg)->finished = true;
+    vTaskDelete(NULL);
+}
+
+void spi_task2(void* arg)
+{
+    int count=0;
+    //task2 acquire the bus, send 50 polling transactions and then 50 non-polling
+    spi_transaction_t t = {
+        .flags = SPI_TRANS_USE_TXDATA,
+        .tx_data = { 0x80, 0x12, 0x34, 0x56 },
+        .length = 4*8,
+    };
+    spi_transaction_t *ret_t;
+    spi_device_handle_t handle = ((task_context_t*)arg)->handle;
+    TEST_ESP_OK(spi_device_acquire_bus( handle, portMAX_DELAY ));
+
+    for (int i = 0; i < 50; i ++) {
+        TEST_ESP_OK(spi_device_polling_transmit(handle, &t));
+        ESP_LOGI( TAG, "task2: %d", count++ );
+    }
+
+    for( int j = 0; j < 50; j ++ ) {
+        TEST_ESP_OK(spi_device_queue_trans( handle, &t, portMAX_DELAY ));
+    }
+    for( int j = 0; j < 50; j ++ ) {
+        TEST_ESP_OK(spi_device_get_trans_result(handle, &ret_t, portMAX_DELAY));
+        assert(ret_t == &t);
+        ESP_LOGI( TAG, "task2: %d", count++ );
+    }
+    spi_device_release_bus(handle);
+    vTaskDelay(1);
+    ESP_LOGI(TAG, "task2 terminates");
+    ((task_context_t*)arg)->finished = true;
+    vTaskDelete(NULL);
+}
+
+void spi_task3(void* arg)
+{
+    //task3 send 30 polling transactions, acquire the bus, send 20 polling transactions and then 50 non-polling
+    int count=0;
+    spi_transaction_t t = {
+        .flags = SPI_TRANS_USE_TXDATA,
+        .tx_data = { 0x80, 0x12, 0x34, 0x56 },
+        .length = 4*8,
+    };
+    spi_transaction_t *ret_t;
+    spi_device_handle_t handle = ((task_context_t*)arg)->handle;
+
+    for (int i = 0; i < 30; i ++) {
+        TEST_ESP_OK(spi_device_polling_transmit(handle, &t));
+        ESP_LOGI( TAG, "task3: %d", count++ );
+    }
+
+    TEST_ESP_OK(spi_device_acquire_bus( handle, portMAX_DELAY ));
+    for (int i = 0; i < 20; i ++) {
+        TEST_ESP_OK(spi_device_polling_transmit(handle, &t));
+        ESP_LOGI( TAG, "task3: %d", count++ );
+    }
+
+    for (int j = 0; j < 50; j++) {
+        TEST_ESP_OK(spi_device_queue_trans(handle, &t, portMAX_DELAY));
+    }
+    for (int j = 0; j < 50; j++) {
+        TEST_ESP_OK(spi_device_get_trans_result(handle, &ret_t, portMAX_DELAY));
+        assert(ret_t == &t);
+        ESP_LOGI(TAG, "task3: %d", count++);
+    }
+    spi_device_release_bus(handle);
+
+    ESP_LOGI(TAG, "task3 terminates");
+    ((task_context_t*)arg)->finished = true;
+    vTaskDelete(NULL);
+}
+
+TEST_CASE("spi poll tasks","[spi]")
+{
+    task_context_t context1={};
+    task_context_t context2={};
+    task_context_t context3={};
+    TaskHandle_t task1, task2, task3;
+    esp_err_t ret;
+    spi_bus_config_t buscfg=SPI_BUS_TEST_DEFAULT_CONFIG();
+    spi_device_interface_config_t devcfg=SPI_DEVICE_TEST_DEFAULT_CONFIG();
+    devcfg.queue_size = 100;
+
+    //Initialize the SPI bus and 3 devices
+    ret=spi_bus_initialize(HSPI_HOST, &buscfg, 1);
+    TEST_ASSERT(ret==ESP_OK);
+    ret=spi_bus_add_device(HSPI_HOST, &devcfg, &context1.handle);
+    TEST_ASSERT(ret==ESP_OK);
+    ret=spi_bus_add_device(HSPI_HOST, &devcfg, &context2.handle);
+    TEST_ASSERT(ret==ESP_OK);
+    ret=spi_bus_add_device(HSPI_HOST, &devcfg, &context3.handle);
+    TEST_ASSERT(ret==ESP_OK);
+
+    xTaskCreate( spi_task1, "task1", 2048, &context1, 0, &task1 );
+    xTaskCreate( spi_task2, "task2", 2048, &context2, 0, &task2 );
+    xTaskCreate( spi_task3, "task3", 2048, &context3, 0, &task3 );
+
+    for(;;){
+        vTaskDelay(10);
+        if (context1.finished && context2.finished && context3.finished) break;
+    }
+
+    TEST_ESP_OK( spi_bus_remove_device(context1.handle) );
+    TEST_ESP_OK( spi_bus_remove_device(context2.handle) );
+    TEST_ESP_OK( spi_bus_remove_device(context3.handle) );
+    TEST_ESP_OK( spi_bus_free(HSPI_HOST) );
+}
+
+
+//TODO: add a case when a non-polling transaction happened in the bus-acquiring time and then release the bus then queue a new trans

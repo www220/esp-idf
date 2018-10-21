@@ -4,7 +4,7 @@ Partition Tables
 Overview
 --------
 
-A single ESP32's flash can contain multiple apps, as well as many different kinds of data (calibration data, filesystems, parameter storage, etc). For this reason a partition table is flashed to (:envvar:`default offset <CONFIG_PARTITION_TABLE_OFFSET>`) 0x8000 in the flash.
+A single ESP32's flash can contain multiple apps, as well as many different kinds of data (calibration data, filesystems, parameter storage, etc). For this reason a partition table is flashed to (:ref:`default offset <CONFIG_PARTITION_TABLE_OFFSET>`) 0x8000 in the flash.
 
 Partition table length is 0xC00 bytes (maximum 95 partition table entries). An MD5 checksum is appended after the table data. If the partition table is signed due to `secure boot`, the signature is appended after the partition table.
 
@@ -53,13 +53,14 @@ If you choose "Custom partition table CSV" in menuconfig then you can also enter
 
 The CSV format is the same format as printed in the summaries shown above. However, not all fields are required in the CSV. For example, here is the "input" CSV for the OTA partition table::
 
-  # Name,   Type, SubType, Offset, Size, Flags
-  nvs,      data, nvs,     ,       0x4000,
-  otadata,  data, ota,     ,       0x2000,
-  phy_init, data, phy,     ,       0x1000,
-  factory,  app,  factory, ,       1M,
-  ota_0,    app,  ota_0,   ,       1M,
-  ota_1,    app,  ota_1,   ,       1M,
+  # Name,   Type, SubType,  Offset,   Size,  Flags
+  nvs,      data, nvs,      0x9000,  0x4000
+  otadata,  data, ota,      0xd000,  0x2000
+  phy_init, data, phy,      0xf000,  0x1000
+  factory,  app,  factory,  0x10000,  1M
+  ota_0,    app,  ota_0,    ,         1M
+  ota_1,    app,  ota_1,    ,         1M
+  nvs_key,  data, nvs_keys, ,        0x1000
 
 * Whitespace between fields is ignored, and so is any line starting with # (comments).
 * Each non-comment line in the CSV file is a partition definition.
@@ -107,7 +108,7 @@ When type is "data", the subtype field can be specified as ota (0), phy (1), nvs
 - phy (1) is for storing PHY initialisation data. This allows PHY to be configured per-device, instead of in firmware.
 
   - In the default configuration, the phy partition is not used and PHY initialisation data is compiled into the app itself. As such, this partition can be removed from the partition table to save space.
-  - To load PHY data from this partition, run ``make menuconfig`` and enable :envvar:`CONFIG_ESP32_PHY_INIT_DATA_IN_PARTITION` option. You will also need to flash your devices with phy init data as the esp-idf build system does not do this automatically.
+  - To load PHY data from this partition, run ``make menuconfig`` and enable :ref:`CONFIG_ESP32_PHY_INIT_DATA_IN_PARTITION` option. You will also need to flash your devices with phy init data as the esp-idf build system does not do this automatically.
 - nvs (2) is for the :doc:`Non-Volatile Storage (NVS) API <../api-reference/storage/nvs_flash>`.
 
   - NVS is used to store per-device PHY calibration data (different to initialisation data).
@@ -115,6 +116,9 @@ When type is "data", the subtype field can be specified as ota (0), phy (1), nvs
   - The NVS API can also be used for other application data.
   - It is strongly recommended that you include an NVS partition of at least 0x3000 bytes in your project.
   - If using NVS API to store a lot of data, increase the NVS partition size from the default 0x6000 bytes.
+- keys (4) is for the NVS key partition. See :doc:`Non-Volatile Storage (NVS) API <../api-reference/storage/nvs_flash>` for more details.
+  - It is used to store NVS encryption keys when `NVS Encryption` feature is enabled.
+  - The size of this partition should be 4096 bytes (minimum partition size).
 
 Other data subtypes are reserved for future esp-idf uses.
 
@@ -127,7 +131,7 @@ App partitions have to be at offsets aligned to 0x10000 (64K). If you leave the 
 
 Sizes and offsets can be specified as decimal numbers, hex numbers with the prefix 0x, or size multipliers K or M (1024 and 1024*1024 bytes).
 
-If you want the partitions in the partition table to work with any starting offset (:envvar:`CONFIG_PARTITION_TABLE_OFFSET`) of the table itself, leave the offset field (in CSV file) for all partitions blank. Similarly, if changing the partition table offset then be aware that all blank partition offsets may change to match, and that any fixed offsets may now collide with the partition table (causing an error).
+If you want the partitions in the partition table to work with any starting offset (:ref:`CONFIG_PARTITION_TABLE_OFFSET`) of the table itself, leave the offset field (in CSV file) for all partitions blank. Similarly, if changing the partition table offset then be aware that all blank partition offsets may change to match, and that any fixed offsets may now collide with the partition table (causing an error).
 
 Flags
 ~~~~~
@@ -160,7 +164,7 @@ MD5 checksum
 
 The binary format of the partition table contains an MD5 checksum computed based on the partition table. This checksum is used for checking the integrity of the partition table during the boot.
 
-The MD5 checksum generation can be disabled by the ``--disable-md5sum`` option of ``gen_esp32part.py`` or by the :envvar:`CONFIG_PARTITION_TABLE_MD5` option. This is useful for example when one uses a legacy bootloader which cannot process MD5 checksums and the boot fails with the error message ``invalid magic number 0xebeb``.
+The MD5 checksum generation can be disabled by the ``--disable-md5sum`` option of ``gen_esp32part.py`` or by the :ref:`CONFIG_PARTITION_TABLE_MD5` option. This is useful for example when one uses a legacy bootloader which cannot process MD5 checksums and the boot fails with the error message ``invalid magic number 0xebeb``.
 
 Flashing the partition table
 ----------------------------

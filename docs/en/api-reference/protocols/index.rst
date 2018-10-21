@@ -9,5 +9,7 @@ Protocols API
    HTTP Client <esp_http_client>
    HTTP Server <http_server>
    ASIO <asio>
+   ESP-MQTT <mqtt>
+   Modbus slave <modbus>
 
 Example code for this API section is provided in :example:`protocols` directory of ESP-IDF examples.

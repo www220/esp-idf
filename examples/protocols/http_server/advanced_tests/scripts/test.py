@@ -129,141 +129,176 @@
 #    - Simple GET on /hello/restart_results (returns the leak results)
 
 
+from __future__ import division
+from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
 import threading
 import socket
 import time
 import argparse
-import requests
-import signal
+import http.client
 import sys
 import string
 import random
+import Utility
 
 _verbose_ = False
 
-class Session:
-    def __init__(self, addr, port):
-        self.client = socket.create_connection((addr, int(port)))
-        self.client.settimeout(30)
+class Session(object):
+    def __init__(self, addr, port, timeout = 15):
+        self.client = socket.create_connection((addr, int(port)), timeout = timeout)
         self.target = addr
+        self.status = 0
+        self.encoding = ''
+        self.content_type = ''
+        self.content_len = 0
+
+    def send_err_check(self, request, data=None):
+        rval = True
+        try:
+            self.client.sendall(request.encode());
+            if data:
+                self.client.sendall(data.encode())
+        except socket.error as err:
+            self.client.close()
+            Utility.console_log("Socket Error in send :", err)
+            rval = False
+        return rval
 
     def send_get(self, path, headers=None):
         request = "GET " + path + " HTTP/1.1\r\nHost: " + self.target
         if headers:
-            for field, value in headers.iteritems():
+            for field, value in headers.items():
                 request += "\r\n"+field+": "+value
         request += "\r\n\r\n"
-        self.client.send(request);
+        return self.send_err_check(request)
 
     def send_put(self, path, data, headers=None):
         request = "PUT " + path +  " HTTP/1.1\r\nHost: " + self.target
         if headers:
-            for field, value in headers.iteritems():
+            for field, value in headers.items():
                 request += "\r\n"+field+": "+value
         request += "\r\nContent-Length: " + str(len(data)) +"\r\n\r\n"
-        self.client.send(request)
-        self.client.send(data)
+        return self.send_err_check(request, data)
 
     def send_post(self, path, data, headers=None):
         request = "POST " + path +  " HTTP/1.1\r\nHost: " + self.target
         if headers:
-            for field, value in headers.iteritems():
+            for field, value in headers.items():
                 request += "\r\n"+field+": "+value
         request += "\r\nContent-Length: " + str(len(data)) +"\r\n\r\n"
-        self.client.send(request)
-        self.client.send(data)
+        return self.send_err_check(request, data)
 
     def read_resp_hdrs(self):
-        state = 'nothing'
-        resp_read = ''
-        while True:
-            char = self.client.recv(1)
-            if char == '\r' and state == 'nothing':
-                state = 'first_cr'
-            elif char == '\n' and state == 'first_cr':
-                state = 'first_lf'
-            elif char == '\r' and state == 'first_lf':
-                state = 'second_cr'
-            elif char == '\n' and state == 'second_cr':
-                state = 'second_lf'
-            else:
-                state = 'nothing'
-            resp_read += char
-            if state == 'second_lf':
-               break;
-        # Handle first line
-        line_hdrs = resp_read.splitlines()
-        line_comp = line_hdrs[0].split()
-        self.status = line_comp[1]
-        del line_hdrs[0]
-        self.encoding = ''
-        self.content_type = ''
-        headers = dict()
-        # Process other headers
-        for h in range(len(line_hdrs)):
-            line_comp = line_hdrs[h].split(':')
-            if line_comp[0] == 'Content-Length':
-                self.content_len = int(line_comp[1])
-            if line_comp[0] == 'Content-Type':
-                self.content_type = line_comp[1].lstrip()
-            if line_comp[0] == 'Transfer-Encoding':
-                self.encoding = line_comp[1].lstrip()
-            if len(line_comp) == 2:
-                headers[line_comp[0]] = line_comp[1].lstrip()
-        return headers
+        try:
+            state = 'nothing'
+            resp_read = ''
+            while True:
+                char = self.client.recv(1).decode()
+                if char == '\r' and state == 'nothing':
+                    state = 'first_cr'
+                elif char == '\n' and state == 'first_cr':
+                    state = 'first_lf'
+                elif char == '\r' and state == 'first_lf':
+                    state = 'second_cr'
+                elif char == '\n' and state == 'second_cr':
+                    state = 'second_lf'
+                else:
+                    state = 'nothing'
+                resp_read += char
+                if state == 'second_lf':
+                    break
+            # Handle first line
+            line_hdrs = resp_read.splitlines()
+            line_comp = line_hdrs[0].split()
+            self.status = line_comp[1]
+            del line_hdrs[0]
+            self.encoding = ''
+            self.content_type = ''
+            headers = dict()
+            # Process other headers
+            for h in range(len(line_hdrs)):
+                line_comp = line_hdrs[h].split(':')
+                if line_comp[0] == 'Content-Length':
+                    self.content_len = int(line_comp[1])
+                if line_comp[0] == 'Content-Type':
+                    self.content_type = line_comp[1].lstrip()
+                if line_comp[0] == 'Transfer-Encoding':
+                    self.encoding = line_comp[1].lstrip()
+                if len(line_comp) == 2:
+                    headers[line_comp[0]] = line_comp[1].lstrip()
+            return headers
+        except socket.error as err:
+            self.client.close()
+            Utility.console_log("Socket Error in recv :", err)
+            return None
 
     def read_resp_data(self):
-        read_data = ''
-        if self.encoding != 'chunked':
-            while len(read_data) != self.content_len:
-                read_data += self.client.recv(self.content_len)
-            self.content_len = 0
-        else:
-            chunk_data_buf = ''
-            while (True):
-                # Read one character into temp  buffer
-                read_ch = self.client.recv(1)
-                # Check CRLF
-                if (read_ch == '\r'):
+        try:
+            read_data = ''
+            if self.encoding != 'chunked':
+                while len(read_data) != self.content_len:
+                    read_data += self.client.recv(self.content_len).decode()
+            else:
+                chunk_data_buf = ''
+                while (True):
+                    # Read one character into temp  buffer
                     read_ch = self.client.recv(1)
-                    if (read_ch == '\n'):
-                        # If CRLF decode length of chunk
-                        chunk_len = int(chunk_data_buf, 16)
-                        # Keep adding to contents
-                        self.content_len += chunk_len
-                        read_data += self.client.recv(chunk_len)
-                        chunk_data_buf = ''
-                        # Fetch remaining CRLF
-                        if self.client.recv(2) != "\r\n":
-                            # Error in packet
-                            return None
-                        if not chunk_len:
-                            # If last chunk
-                            break
-                        continue
-                    chunk_data_buf += '\r'
-                # If not CRLF continue appending
-                # character to chunked data buffer
-                chunk_data_buf += read_ch
-        return read_data
+                    # Check CRLF
+                    if (read_ch == '\r'):
+                        read_ch = self.client.recv(1).decode()
+                        if (read_ch == '\n'):
+                            # If CRLF decode length of chunk
+                            chunk_len = int(chunk_data_buf, 16)
+                            # Keep adding to contents
+                            self.content_len += chunk_len
+                            rem_len = chunk_len
+                            while (rem_len):
+                                new_data = self.client.recv(rem_len)
+                                read_data += new_data
+                                rem_len -= len(new_data)
+                            chunk_data_buf = ''
+                            # Fetch remaining CRLF
+                            if self.client.recv(2) != "\r\n":
+                                # Error in packet
+                                Utility.console_log("Error in chunked data")
+                                return None
+                            if not chunk_len:
+                                # If last chunk
+                                break
+                            continue
+                        chunk_data_buf += '\r'
+                    # If not CRLF continue appending
+                    # character to chunked data buffer
+                    chunk_data_buf += read_ch
+            return read_data
+        except socket.error as err:
+            self.client.close()
+            Utility.console_log("Socket Error in recv :", err)
+            return None
 
     def close(self):
         self.client.close()
 
 def test_val(text, expected, received):
     if expected != received:
-        print " Fail!"
-        print "  [reason] " + text + ":"
-        print "        expected: " + str(expected)
-        print "        received: " + str(received)
+        Utility.console_log(" Fail!")
+        Utility.console_log("  [reason] " + text + ":")
+        Utility.console_log("        expected: " + str(expected))
+        Utility.console_log("        received: " + str(received))
         return False
     return True
 
-class myThread (threading.Thread):
+class adder_thread (threading.Thread):
     def __init__(self, id, dut, port):
         threading.Thread.__init__(self)
         self.id = id
         self.dut = dut
+        self.depth = 3
         self.session = Session(dut, port)
 
     def run(self):
@@ -271,25 +306,22 @@ class myThread (threading.Thread):
 
         # Pipeline 3 requests
         if (_verbose_):
-            print "   Thread: Using adder start " + str(self.id)
-        self.session.send_post('/adder', str(self.id));
-        time.sleep(1)
-        self.session.send_post('/adder', str(self.id));
-        time.sleep(1)
-        self.session.send_post('/adder', str(self.id));
-        time.sleep(1)
+            Utility.console_log("   Thread: Using adder start " + str(self.id))
 
-        self.session.read_resp_hdrs()
-        self.response.append(self.session.read_resp_data())
-        self.session.read_resp_hdrs()
-        self.response.append(self.session.read_resp_data())
-        self.session.read_resp_hdrs()
-        self.response.append(self.session.read_resp_data())
+        for _ in range(self.depth):
+            self.session.send_post('/adder', str(self.id))
+            time.sleep(2)
+
+        for _ in range(self.depth):
+            self.session.read_resp_hdrs()
+            self.response.append(self.session.read_resp_data())
 
     def adder_result(self):
+        if len(self.response) != self.depth:
+            Utility.console_log("Error : missing response packets")
+            return False
         for i in range(len(self.response)):
-#            print self.response[i]
-            if not test_val("thread" + str(self.id) + ": response[" + str(i) + "]",
+            if not test_val("Thread" + str(self.id) + " response[" + str(i) + "]",
                             str(self.id * (i + 1)), str(self.response[i])):
                 return False
         return True
@@ -299,125 +331,166 @@ class myThread (threading.Thread):
 
 def get_hello(dut, port):
     # GET /hello should return 'Hello World!'
-    print "[test] GET /hello returns 'Hello World!' =>",
-    r = requests.get("http://" + dut + ":" + port + "/hello")
-    if not test_val("status_code", 200, r.status_code):
+    Utility.console_log("[test] GET /hello returns 'Hello World!' =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("GET", "/hello")
+    resp = conn.getresponse()
+    if not test_val("status_code", 200, resp.status):
+        conn.close()
         return False
-    if not test_val("data", "Hello World!", r.text):
+    if not test_val("data", "Hello World!", resp.read().decode()):
+        conn.close()
         return False
-    if not test_val("data", "application/json", r.headers['Content-Type']):
+    if not test_val("data", "text/html", resp.getheader('Content-Type')):
+        conn.close()
         return False
-    print "Success"
-    return True
-
-def post_hello(dut, port):
-    # PUT /hello returns 405'
-    print "[test] PUT /hello returns 405' =>",
-    r = requests.put("http://" + dut + ":" + port + "/hello", data="Hello")
-    if not test_val("status_code", 405, r.status_code):
-        return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def put_hello(dut, port):
-    # POST /hello returns 405'
-    print "[test] POST /hello returns 404' =>",
-    r = requests.post("http://" + dut + ":" + port + "/hello", data="Hello")
-    if not test_val("status_code", 405, r.status_code):
+    # PUT /hello returns 405'
+    Utility.console_log("[test] PUT /hello returns 405 =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("PUT", "/hello", "Hello")
+    resp = conn.getresponse()
+    if not test_val("status_code", 405, resp.status):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
+    return True
+
+def post_hello(dut, port):
+    # POST /hello returns 405'
+    Utility.console_log("[test] POST /hello returns 404 =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("POST", "/hello", "Hello")
+    resp = conn.getresponse()
+    if not test_val("status_code", 405, resp.status):
+        conn.close()
+        return False
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def post_echo(dut, port):
     # POST /echo echoes data'
-    print "[test] POST /echo echoes data' =>",
-    r = requests.post("http://" + dut + ":" + port + "/echo", data="Hello")
-    if not test_val("status_code", 200, r.status_code):
+    Utility.console_log("[test] POST /echo echoes data =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("POST", "/echo", "Hello")
+    resp = conn.getresponse()
+    if not test_val("status_code", 200, resp.status):
+        conn.close()
         return False
-    if not test_val("data", "Hello", r.text):
+    if not test_val("data", "Hello", resp.read().decode()):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def put_echo(dut, port):
-    # POST /echo echoes data'
-    print "[test] PUT /echo echoes data' =>",
-    r = requests.put("http://" + dut + ":" + port + "/echo", data="Hello")
-    if not test_val("status_code", 200, r.status_code):
+    # PUT /echo echoes data'
+    Utility.console_log("[test] PUT /echo echoes data =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("PUT", "/echo", "Hello")
+    resp = conn.getresponse()
+    if not test_val("status_code", 200, resp.status):
+        conn.close()
         return False
-    if not test_val("data", "Hello", r.text):
+    if not test_val("data", "Hello", resp.read().decode()):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def get_echo(dut, port):
     # GET /echo returns 404'
-    print "[test] GET /echo returns 405' =>",
-    r = requests.get("http://" + dut + ":" + port + "/echo")
-    if not test_val("status_code", 405, r.status_code):
+    Utility.console_log("[test] GET /echo returns 405 =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("GET", "/echo")
+    resp = conn.getresponse()
+    if not test_val("status_code", 405, resp.status):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def get_hello_type(dut, port):
     # GET /hello/type_html returns text/html as Content-Type'
-    print "[test] GET /hello/type_html has Content-Type of text/html =>",
-    r = requests.get("http://" + dut + ":" + port + "/hello/type_html")
-    if not test_val("status_code", 200, r.status_code):
+    Utility.console_log("[test] GET /hello/type_html has Content-Type of text/html =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("GET", "/hello/type_html")
+    resp = conn.getresponse()
+    if not test_val("status_code", 200, resp.status):
+        conn.close()
         return False
-    if not test_val("data", "Hello World!", r.text):
+    if not test_val("data", "Hello World!", resp.read().decode()):
+        conn.close()
         return False
-    if not test_val("data", "text/html", r.headers['Content-Type']):
+    if not test_val("data", "text/html", resp.getheader('Content-Type')):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def get_hello_status(dut, port):
     # GET /hello/status_500 returns status 500'
-    print "[test] GET /hello/status_500 returns status 500 =>",
-    r = requests.get("http://" + dut + ":" + port + "/hello/status_500")
-    if not test_val("status_code", 500, r.status_code):
+    Utility.console_log("[test] GET /hello/status_500 returns status 500 =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("GET", "/hello/status_500")
+    resp = conn.getresponse()
+    if not test_val("status_code", 500, resp.status):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def get_false_uri(dut, port):
     # GET /false_uri returns status 404'
-    print "[test] GET /false_uri returns status 404 =>",
-    r = requests.get("http://" + dut + ":" + port + "/false_uri")
-    if not test_val("status_code", 404, r.status_code):
+    Utility.console_log("[test] GET /false_uri returns status 404 =>", end=' ')
+    conn = http.client.HTTPConnection(dut, int(port), timeout=15)
+    conn.request("GET", "/false_uri")
+    resp = conn.getresponse()
+    if not test_val("status_code", 404, resp.status):
+        conn.close()
         return False
-    print "Success"
+    Utility.console_log("Success")
+    conn.close()
     return True
 
 def parallel_sessions_adder(dut, port, max_sessions):
     # POSTs on /adder in parallel sessions
-    print "[test] POST {pipelined} on /adder in " + str(max_sessions) + " sessions =>",
+    Utility.console_log("[test] POST {pipelined} on /adder in " + str(max_sessions) + " sessions =>", end=' ')
     t = []
-# Create all sessions
-    for i in xrange(max_sessions):
-        t.append(myThread(i * 2, dut, port))
+    # Create all sessions
+    for i in range(max_sessions):
+        t.append(adder_thread(i, dut, port))
 
-    for i in xrange(len(t)):
+    for i in range(len(t)):
         t[i].start()
 
-    for i in xrange(len(t)):
+    for i in range(len(t)):
         t[i].join()
 
     res = True
-    for i in xrange(len(t)):
-        if not t[i].adder_result():
-            if not test_val("Thread" + str(i) + "Failed", "True", "False"):
-                res = False
+    for i in range(len(t)):
+        if not test_val("Thread" + str(i) + " Failed", t[i].adder_result(), True):
+            res = False
         t[i].close()
     if (res):
-        print "Success"
+        Utility.console_log("Success")
     return res
 
 def async_response_test(dut, port):
     # Test that an asynchronous work is executed in the HTTPD's context
     # This is tested by reading two responses over the same session
-    print "[test] Test HTTPD Work Queue (Async response) =>",
+    Utility.console_log("[test] Test HTTPD Work Queue (Async response) =>", end=' ')
     s = Session(dut, port)
 
     s.send_get('/async_data')
@@ -430,179 +503,139 @@ def async_response_test(dut, port):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def leftover_data_test(dut, port):
     # Leftover data in POST is purged (valid and invalid URIs)
-    print "[test] Leftover data in POST is purged (valid and invalid URIs) =>",
-    s = Session(dut, port)
+    Utility.console_log("[test] Leftover data in POST is purged (valid and invalid URIs) =>", end=' ')
+    s = http.client.HTTPConnection(dut + ":" + port, timeout=15)
 
-    s.send_post('/leftover_data',
-                "abcdefghijklmnopqrstuvwxyz\r\nabcdefghijklmnopqrstuvwxyz")
-    s.read_resp_hdrs()
-    if not test_val("Partial data", "abcdefghij", s.read_resp_data()):
+    s.request("POST", url='/leftover_data', body="abcdefghijklmnopqrstuvwxyz\r\nabcdefghijklmnopqrstuvwxyz")
+    resp = s.getresponse()
+    if not test_val("Partial data", "abcdefghij", resp.read().decode()):
         s.close()
         return False
 
-    s.send_get('/hello')
-    s.read_resp_hdrs()
-    if not test_val("Hello World Data", "Hello World!", s.read_resp_data()):
+    s.request("GET", url='/hello')
+    resp = s.getresponse()
+    if not test_val("Hello World Data", "Hello World!", resp.read().decode()):
         s.close()
         return False
 
-    s.send_post('/false_uri',
-                "abcdefghijklmnopqrstuvwxyz\r\nabcdefghijklmnopqrstuvwxyz")
-    s.read_resp_hdrs()
-    if not test_val("False URI Status", str(404), str(s.status)):
+    s.request("POST", url='/false_uri', body="abcdefghijklmnopqrstuvwxyz\r\nabcdefghijklmnopqrstuvwxyz")
+    resp = s.getresponse()
+    if not test_val("False URI Status", str(404), str(resp.status)):
         s.close()
         return False
-    s.read_resp_data()
+    resp.read()
 
-    s.send_get('/hello')
-    s.read_resp_hdrs()
-    if not test_val("Hello World Data", "Hello World!", s.read_resp_data()):
+    s.request("GET", url='/hello')
+    resp = s.getresponse()
+    if not test_val("Hello World Data", "Hello World!", resp.read().decode()):
         s.close()
         return False
 
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
-def timeout_handler(signum, frame):
-    raise Exception("Timeout")
-
-def spillover_session(dut, port, max):
-    # Session max_sessions + 1 is rejected
-    print "[test] Session max_sessions (" + str(max) + ") + 1 is rejected =>",
+def spillover_session(dut, port, max_sess):
+    # Session max_sess_sessions + 1 is rejected
+    Utility.console_log("[test] Session max_sess_sessions (" + str(max_sess) + ") + 1 is rejected =>", end=' ')
     s = []
-    # Register a timeout callback
-    signal.signal(signal.SIGALRM, timeout_handler)
-    for i in xrange(max + 1):
+    _verbose_ = True
+    for i in range(max_sess + 1):
         if (_verbose_):
-            print "Executing " + str(i)
-        a = Session(dut, port)
-        a.send_get('/hello')
-
+            Utility.console_log("Executing " + str(i))
         try:
-            # Check for response timeout
-            signal.alarm(5)
-            a.read_resp_hdrs()
-            a.read_resp_data()
-            signal.alarm(0)
-
-            # Control reaches here only if connection was established
+            a = http.client.HTTPConnection(dut + ":" + port, timeout=15)
+            a.request("GET", url='/hello')
+            resp = a.getresponse()
+            if not test_val("Connection " + str(i), "Hello World!", resp.read().decode()):
+                a.close()
+                break
             s.append(a)
-        except Exception, msg:
+        except:
             if (_verbose_):
-                print str(msg) + ": Connection " + str(i) + " rejected"
+                Utility.console_log("Connection " + str(i) + " rejected")
+            a.close()
             break
 
     # Close open connections
     for a in s:
         a.close()
 
-    # Check if number of connections is equal to max
-    print ["Fail","Success"][len(s) == max]
-    return (len(s) == max)
+    # Check if number of connections is equal to max_sess
+    Utility.console_log(["Fail","Success"][len(s) == max_sess])
+    return (len(s) == max_sess)
 
 def recv_timeout_test(dut, port):
-    print "[test] Timeout occurs if partial packet sent =>",
-    signal.signal(signal.SIGALRM, timeout_handler)
+    Utility.console_log("[test] Timeout occurs if partial packet sent =>", end=' ')
     s = Session(dut, port)
-    s.client.send("GE")
-    try:
-        signal.alarm(15)
-        s.read_resp_hdrs()
-        resp = s.read_resp_data()
-        signal.alarm(0)
-        if not test_val("Request Timeout", "Server closed this connection", resp):
-            s.close()
-            return False
-    except:
+    s.client.sendall(b"GE")
+    s.read_resp_hdrs()
+    resp = s.read_resp_data()
+    if not test_val("Request Timeout", "Server closed this connection", resp):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
-
-def pipeline_test(dut, port, max_sess):
-    print "[test] Pipelining test =>",
-    s = [Session(dut, port) for _ in range(max_sess)]
-    path = "/echo"
-    pipeline_depth = 10
-    header = "POST " + path + " HTTP/1.1\r\nHost: " + dut + "\r\nContent-Length: "
-    s[0].client.send(header)
-    for i in range(1, max_sess):
-        for j in range(pipeline_depth):
-            data = str(i) + ":" + str(j)
-            request = header + str(len(data)) + "\r\n\r\n" + data
-            s[i].client.send(request)
-
-    s[0].client.send(str(len("0:0")) + "\r\n\r\n" + "0:0")
-    for j in range(1, pipeline_depth):
-        data = "0:" + str(j)
-        request = header + str(len(data)) + "\r\n\r\n" + data
-        s[0].client.send(request)
-
-    res = True
-    for i in range(max_sess):
-        #time.sleep(1)
-        for j in range(pipeline_depth):
-            s[i].read_resp_hdrs()
-            echo_data = s[i].read_resp_data()
-            if (_verbose_):
-                print "[" + str(i) + "][" + str(j) + "] = " + echo_data
-            if not test_val("Echo Data", str(i) + ":" + str(j), echo_data):
-                res = False
-        s[i].close()
-
-    #for i in range(max_sess):
-        #s[i].close()
-
-    if (res):
-        print "Success"
-    return res
 
 def packet_size_limit_test(dut, port, test_size):
-    print "[test] LWIP send size limit test =>",
-    s = Session(dut, port)
-    random_data = ''.join(string.printable[random.randint(0,len(string.printable))-1] for _ in range(test_size))
-    path = "/echo"
-    s.send_post(path, random_data)
-    s.read_resp_hdrs()
-    resp = s.read_resp_data()
-    result = (resp == random_data)
-    if not result:
-        test_val("Data size", str(len(random_data)), str(len(resp)))
+    Utility.console_log("[test] send size limit test =>", end=' ')
+    retry = 5
+    while (retry):
+        retry -= 1
+        Utility.console_log("data size = ", test_size)
+        s = http.client.HTTPConnection(dut + ":" + port, timeout=15)
+        random_data = ''.join(string.printable[random.randint(0,len(string.printable))-1] for _ in list(range(test_size)))
+        path = "/echo"
+        s.request("POST", url=path, body=random_data)
+        resp = s.getresponse()
+        if not test_val("Error", "200", str(resp.status)):
+            if test_val("Error", "500", str(resp.status)):
+                Utility.console_log("Data too large to be allocated")
+                test_size = test_size//10
+            else:
+                Utility.console_log("Unexpected error")
+            s.close()
+            Utility.console_log("Retry...")
+            continue
+        resp = resp.read().decode()
+        result = (resp == random_data)
+        if not result:
+            test_val("Data size", str(len(random_data)), str(len(resp)))
+            s.close()
+            Utility.console_log("Retry...")
+            continue
         s.close()
-        return False
-    print "Success"
-    s.close()
-    return True
+        Utility.console_log("Success")
+        return True
+    Utility.console_log("Failed")
+    return False
 
 def code_500_server_error_test(dut, port):
-    print "[test] 500 Server Error test =>",
+    Utility.console_log("[test] 500 Server Error test =>", end=' ')
     s = Session(dut, port)
-    s.client.send("abcdefgh\0")
+    # Sending a very large content length will cause malloc to fail
+    content_len = 2**31
+    s.client.sendall(("POST /echo HTTP/1.1\r\nHost: " + dut + "\r\nContent-Length: " + str(content_len) + "\r\n\r\nABCD").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
-    # Presently server sends back 400 Bad Request
-    #if not test_val("Server Error", "500", s.status):
-        #s.close()
-        #return False
-    if not test_val("Server Error", "400", s.status):
+    if not test_val("Server Error", "500", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_501_method_not_impl(dut, port):
-    print "[test] 501 Method Not Implemented =>",
+    Utility.console_log("[test] 501 Method Not Implemented =>", end=' ')
     s = Session(dut, port)
     path = "/hello"
-    s.client.send("ABC " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n")
+    s.client.sendall(("ABC " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     # Presently server sends back 400 Bad Request
@@ -613,90 +646,83 @@ def code_501_method_not_impl(dut, port):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_505_version_not_supported(dut, port):
-    print "[test] 505 Version Not Supported =>",
+    Utility.console_log("[test] 505 Version Not Supported =>", end=' ')
     s = Session(dut, port)
     path = "/hello"
-    s.client.send("GET " + path + " HTTP/2.0\r\nHost: " + dut + "\r\n\r\n")
+    s.client.sendall(("GET " + path + " HTTP/2.0\r\nHost: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     if not test_val("Server Error", "505", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_400_bad_request(dut, port):
-    print "[test] 400 Bad Request =>",
+    Utility.console_log("[test] 400 Bad Request =>", end=' ')
     s = Session(dut, port)
     path = "/hello"
-    s.client.send("XYZ " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n")
+    s.client.sendall(("XYZ " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     if not test_val("Client Error", "400", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_404_not_found(dut, port):
-    print "[test] 404 Not Found =>",
+    Utility.console_log("[test] 404 Not Found =>", end=' ')
     s = Session(dut, port)
     path = "/dummy"
-    s.client.send("GET " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n")
+    s.client.sendall(("GET " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     if not test_val("Client Error", "404", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_405_method_not_allowed(dut, port):
-    print "[test] 405 Method Not Allowed =>",
+    Utility.console_log("[test] 405 Method Not Allowed =>", end=' ')
     s = Session(dut, port)
     path = "/hello"
-    s.client.send("POST " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n")
+    s.client.sendall(("POST " + path + " HTTP/1.1\r\nHost: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     if not test_val("Client Error", "405", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_408_req_timeout(dut, port):
-    print "[test] 408 Request Timeout =>",
-    signal.signal(signal.SIGALRM, timeout_handler)
+    Utility.console_log("[test] 408 Request Timeout =>", end=' ')
     s = Session(dut, port)
-    s.client.send("POST /echo HTTP/1.1\r\nHost: " + dut + "\r\nContent-Length: 10\r\n\r\nABCD")
-    try:
-        signal.alarm(15)
-        s.read_resp_hdrs()
-        resp = s.read_resp_data()
-        signal.alarm(0)
-        if not test_val("Client Error", "408", s.status):
-            s.close()
-            return False
-    except:
+    s.client.sendall(("POST /echo HTTP/1.1\r\nHost: " + dut + "\r\nContent-Length: 10\r\n\r\nABCD").encode())
+    s.read_resp_hdrs()
+    resp = s.read_resp_data()
+    if not test_val("Client Error", "408", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def code_411_length_required(dut, port):
-    print "[test] 411 Length Required =>",
+    Utility.console_log("[test] 411 Length Required =>", end=' ')
     s = Session(dut, port)
     path = "/echo"
-    s.client.send("POST " + path + " HTTP/1.1\r\nHost: " + dut + "\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n")
+    s.client.sendall(("POST " + path + " HTTP/1.1\r\nHost: " + dut + "\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     # Presently server sends back 400 Bad Request
@@ -707,7 +733,7 @@ def code_411_length_required(dut, port):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def send_getx_uri_len(dut, port, length):
@@ -715,25 +741,25 @@ def send_getx_uri_len(dut, port, length):
     method = "GET "
     version = " HTTP/1.1\r\n"
     path = "/"+"x"*(length - len(method) - len(version) - len("/"))
-    s.client.send(method)
+    s.client.sendall(method.encode())
     time.sleep(1)
-    s.client.send(path)
+    s.client.sendall(path.encode())
     time.sleep(1)
-    s.client.send(version + "Host: " + dut + "\r\n\r\n")
+    s.client.sendall((version + "Host: " + dut + "\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     s.close()
     return s.status
 
 def code_414_uri_too_long(dut, port, max_uri_len):
-    print "[test] 414 URI Too Long =>",
+    Utility.console_log("[test] 414 URI Too Long =>", end=' ')
     status = send_getx_uri_len(dut, port, max_uri_len)
     if not test_val("Client Error", "404", status):
         return False
     status = send_getx_uri_len(dut, port, max_uri_len + 1)
     if not test_val("Client Error", "414", status):
         return False
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def send_postx_hdr_len(dut, port, length):
@@ -742,10 +768,10 @@ def send_postx_hdr_len(dut, port, length):
     host = "Host: " + dut
     custom_hdr_field = "\r\nCustom: "
     custom_hdr_val = "x"*(length - len(host) - len(custom_hdr_field) - len("\r\n\r\n") + len("0"))
-    request = "POST " + path + " HTTP/1.1\r\n" + host + custom_hdr_field + custom_hdr_val + "\r\n\r\n"
-    s.client.send(request[:length/2])
+    request = ("POST " + path + " HTTP/1.1\r\n" + host + custom_hdr_field + custom_hdr_val + "\r\n\r\n").encode()
+    s.client.sendall(request[:length//2])
     time.sleep(1)
-    s.client.send(request[length/2:])
+    s.client.sendall(request[length//2:])
     hdr = s.read_resp_hdrs()
     resp = s.read_resp_data()
     s.close()
@@ -754,28 +780,28 @@ def send_postx_hdr_len(dut, port, length):
     return False, s.status
 
 def code_431_hdr_too_long(dut, port, max_hdr_len):
-    print "[test] 431 Header Too Long =>",
+    Utility.console_log("[test] 431 Header Too Long =>", end=' ')
     res, status = send_postx_hdr_len(dut, port, max_hdr_len)
     if not res:
         return False
     res, status = send_postx_hdr_len(dut, port, max_hdr_len + 1)
     if not test_val("Client Error", "431", status):
         return False
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 def test_upgrade_not_supported(dut, port):
-    print "[test] Upgrade Not Supported =>",
+    Utility.console_log("[test] Upgrade Not Supported =>", end=' ')
     s = Session(dut, port)
     path = "/hello"
-    s.client.send("OPTIONS * HTTP/1.1\r\nHost:" + dut + "\r\nUpgrade: TLS/1.0\r\nConnection: Upgrade\r\n\r\n");
+    s.client.sendall(("OPTIONS * HTTP/1.1\r\nHost:" + dut + "\r\nUpgrade: TLS/1.0\r\nConnection: Upgrade\r\n\r\n").encode())
     s.read_resp_hdrs()
     resp = s.read_resp_data()
     if not test_val("Client Error", "200", s.status):
         s.close()
         return False
     s.close()
-    print "Success"
+    Utility.console_log("Success")
     return True
 
 if __name__ == '__main__':
@@ -799,7 +825,7 @@ if __name__ == '__main__':
 
     _verbose_ = True
 
-    print "### Basic HTTP Client Tests"
+    Utility.console_log("### Basic HTTP Client Tests")
     get_hello(dut, port)
     post_hello(dut, port)
     put_hello(dut, port)
@@ -810,7 +836,7 @@ if __name__ == '__main__':
     get_hello_status(dut, port)
     get_false_uri(dut, port)
 
-    print "### Error code tests"
+    Utility.console_log("### Error code tests")
     code_500_server_error_test(dut, port)
     code_501_method_not_impl(dut, port)
     code_505_version_not_supported(dut, port)
@@ -825,16 +851,12 @@ if __name__ == '__main__':
     # Not supported yet (Error on chunked request)
     ###code_411_length_required(dut, port)
 
-    print "### Sessions and Context Tests"
+    Utility.console_log("### Sessions and Context Tests")
     parallel_sessions_adder(dut, port, max_sessions)
     leftover_data_test(dut, port)
     async_response_test(dut, port)
     spillover_session(dut, port, max_sessions)
     recv_timeout_test(dut, port)
-
-    # May timeout in case requests are sent slower than responses are read.
-    # Instead use httperf stress test
-    pipeline_test(dut, port, max_sessions)
     packet_size_limit_test(dut, port, 50*1024)
     get_hello(dut, port)
 

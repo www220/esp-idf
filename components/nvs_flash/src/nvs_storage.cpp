@@ -180,6 +180,9 @@ esp_err_t Storage::writeMultiPageBlob(uint8_t nsIndex, const char* key, const vo
             err = mPageManager.requestNewPage();
             if (err != ESP_OK) {
                 return err;
+            } else if(getCurrentPage().getVarDataTailroom() == tailroom) {
+                /* We got the same page or we are not improving.*/
+                return ESP_ERR_NVS_NOT_ENOUGH_SPACE; 
             } else {
                 continue;
             }
@@ -220,6 +223,7 @@ esp_err_t Storage::writeMultiPageBlob(uint8_t nsIndex, const char* key, const vo
         if (!remainingSize) {
             /* All pages are stored. Now store the index.*/
             Item item;
+            std::fill_n(item.data, sizeof(item.data), 0xff);
             item.blobIndex.dataSize = dataSize;
             item.blobIndex.chunkCount = chunkCount;
             item.blobIndex.chunkStart = chunkStart;
@@ -257,7 +261,6 @@ esp_err_t Storage::writeItem(uint8_t nsIndex, ItemType datatype, const char* key
         err = findItem(nsIndex, datatype, key, findPage, item);
     }
 
-
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         return err;
     }
@@ -280,6 +283,7 @@ esp_err_t Storage::writeItem(uint8_t nsIndex, ItemType datatype, const char* key
         }
         /* Write the blob with new version*/
         err = writeMultiPageBlob(nsIndex, key, data, dataSize, nextStart);
+
         if (err == ESP_ERR_NVS_PAGE_FULL) {
             return ESP_ERR_NVS_NOT_ENOUGH_SPACE;
         }

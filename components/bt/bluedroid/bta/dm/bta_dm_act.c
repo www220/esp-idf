@@ -765,6 +765,8 @@ void bta_dm_remove_device(tBTA_DM_MSG *p_data)
     if (continue_delete_dev) {
         bta_dm_process_remove_device(p_dev->bd_addr, transport);
     }
+
+    BTM_ClearInqDb (p_dev->bd_addr);
 }
 
 /*******************************************************************************
@@ -972,6 +974,21 @@ void bta_dm_bond_cancel (tBTA_DM_MSG *p_data)
         bta_dm_cb.p_sec_cback(BTA_DM_BOND_CANCEL_CMPL_EVT, &sec_event);
     }
 
+}
+
+/*******************************************************************************
+**
+** Function         bta_dm_set_pin_type
+**
+** Description      Set the pin type and fixed pin
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+void bta_dm_set_pin_type (tBTA_DM_MSG *p_data)
+{
+    BTM_SetPinType (p_data->set_pin_type.pin_type, p_data->set_pin_type.p_pin, p_data->set_pin_type.pin_len);
 }
 
 /*******************************************************************************
@@ -4277,9 +4294,11 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
 
     memset(&sec_event, 0, sizeof(tBTA_DM_SEC));
     switch (event) {
-    case BTM_LE_IO_REQ_EVT:
+    case BTM_LE_IO_REQ_EVT: {
         // #if (BT_SSP_INCLUDED == TRUE)
-
+        UINT8 enable = bta_dm_co_ble_get_accept_auth_enable();
+        UINT8 origin_auth = bta_dm_co_ble_get_auth_req();
+        BTM_BleSetAcceptAuthMode(enable, origin_auth);
         bta_dm_co_ble_io_req(bda,
                              &p_data->io_req.io_cap,
                              &p_data->io_req.oob_data,
@@ -4294,6 +4313,7 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
         APPL_TRACE_EVENT("io mitm: %d oob_data:%d\n", p_data->io_req.auth_req, p_data->io_req.oob_data);
 
         break;
+    }
 
     case BTM_LE_SEC_REQUEST_EVT:
         bdcpy(sec_event.ble_req.bd_addr, bda);
@@ -4369,7 +4389,7 @@ static UINT8 bta_dm_ble_smp_cback (tBTM_LE_EVT event, BD_ADDR bda, tBTM_LE_EVT_D
 
             }
         }
-
+        sec_event.auth_cmpl.auth_mode = p_data->complt.auth_mode;
         if (bta_dm_cb.p_sec_cback) {
             //bta_dm_cb.p_sec_cback(BTA_DM_AUTH_CMPL_EVT, &sec_event);
             bta_dm_cb.p_sec_cback(BTA_DM_BLE_AUTH_CMPL_EVT, &sec_event);
@@ -4487,6 +4507,10 @@ void bta_dm_ble_passkey_reply (tBTA_DM_MSG *p_data)
 
 }
 
+void bta_dm_ble_set_static_passkey(tBTA_DM_MSG *p_data)
+{
+    BTM_BleSetStaticPasskey(p_data->ble_set_static_passkey.add, p_data->ble_set_static_passkey.static_passkey);
+}
 /*******************************************************************************
 **
 ** Function         bta_dm_ble_confirm_reply
@@ -4666,6 +4690,12 @@ void bta_dm_ble_set_rand_address(tBTA_DM_MSG *p_data)
         (*p_data->set_addr.p_set_rand_addr_cback)(status);
     }
 
+}
+
+void bta_dm_ble_clear_rand_address(tBTA_DM_MSG *p_data)
+{
+    UNUSED(p_data);
+    BTM_BleClearRandAddress();
 }
 
 /*******************************************************************************

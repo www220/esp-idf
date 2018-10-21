@@ -1,19 +1,6 @@
 Controller Area Network (CAN)
 =============================
 
-.. _CAN Protocol License Conditions: http://www.bosch-semiconductors.com/media/ip_modules/pdf_2/can_protocol/bosch_can_protocol_license_conditions.pdf
-
-.. warning::
-    Please note that the ESP32 includes a CAN peripheral. The CAN Protocol is 
-    protected by the intellectual property rights of Robert Bosch GmbH. Therefore 
-    a license is required for any implementation of the CAN Protocol
-    (see `CAN Protocol License Conditions`_). **Since the selling price of the 
-    ESP32 includes no such royalty fee, Espressif hereby disclaims any liability or 
-    obligation regarding the CAN Protocol license. Users of the CAN Protocol via
-    the ESP32's CAN peripheral should contact Robert Bosch GmbH directly for the
-    necessary license.**
-
-
 .. -------------------------------- Overview -----------------------------------
 
 Overview
@@ -574,6 +561,23 @@ use of the :cpp:func:`can_stop` and :cpp:func:`can_driver_uninstall` functions.
         return;
     }
 
+Multiple ID Filter Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The acceptance mask in :cpp:type:`can_filter_config_t` can be configured such that 
+two or more IDs will be accepted for a single filter. For a particular filter to 
+accept multiple IDs, the conflicting bit positions amongst the IDs must be set 
+in the acceptance mask. The acceptance code can be set to any one of the IDs.
+
+The following example shows how the calculate the acceptance mask given multiple 
+IDs::
+
+    ID1 =  11'b101 1010 0000
+    ID2 =  11'b101 1010 0001
+    ID3 =  11'b101 1010 0100
+    ID4 =  11'b101 1010 1000
+    //Acceptance Mask
+    MASK = 11'b000 0000 1101
 
 Application Examples
 ^^^^^^^^^^^^^^^^^^^^
@@ -581,19 +585,19 @@ Application Examples
 **Network Example:** The CAN Network example demonstrates communication between 
 two ESP32s using the CAN driver API. One CAN node acts as a network master initiate
 and ceasing the transfer of a data from another CAN node acting as a network slave. 
-The example can be found via :example:`examples/peripheral/can/can_network`.
+The example can be found via :example:`peripherals/can/can_network`.
 
 **Alert and Recovery Example:** This example demonstrates how to use the CAN driver's
 alert and bus recovery API. The example purposely introduces errors on the CAN
 bus to put the CAN controller into the Bus-Off state. An alert is used to detect
 the Bus-Off state and trigger the bus recovery process. The example can be found
-via :example:`examples/peripheral/can/can_alert_and_recovery`.
+via :example:`peripherals/can/can_alert_and_recovery`.
 
 **Self Test Example:** This example uses the No Acknowledge Mode and Self Reception
 Request to cause the CAN controller to send and simultaneously receive a series
 of messages. This example can be used to verify if the connections between the CAN 
 controller and the external transceiver are working correctly. The example can be
-found via :example:`examples/peripheral/can/can_self_test`.
+found via :example:`peripherals/can/can_self_test`.
 
 
 .. ---------------------------- API Reference ----------------------------------

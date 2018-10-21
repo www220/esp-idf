@@ -29,6 +29,7 @@
 #include "btc/btc_dm.h"
 #include "btc/btc_util.h"
 #include "osi/mutex.h"
+#include "esp_bt.h"
 
 static tBTA_BLE_ADV_DATA gl_bta_adv_data;
 static tBTA_BLE_ADV_DATA gl_bta_scan_rsp_data;
@@ -142,6 +143,7 @@ static void btc_to_bta_adv_data(esp_ble_adv_data_t *p_adv_data, tBTA_BLE_ADV_DAT
 
     if (p_adv_data->include_txpower) {
         mask |= BTM_BLE_AD_BIT_TX_PWR;
+        bta_adv_data->tx_power = esp_ble_tx_power_get(ESP_BLE_PWR_TYPE_ADV);
     }
 
     if (p_adv_data->min_interval > 0 && p_adv_data->max_interval > 0 &&
@@ -837,6 +839,11 @@ static void btc_ble_set_rand_addr (BD_ADDR rand_addr, tBTA_SET_RAND_ADDR_CBACK *
     }
 }
 
+static void btc_ble_clear_rand_addr (void)
+{
+    BTA_DmClearRandAddress();
+}
+
 static void btc_ble_config_local_privacy(bool privacy_enable, tBTA_SET_LOCAL_PRIVACY_CBACK *set_local_privacy_cback)
 {
     BTA_DmBleConfigLocalPrivacy(privacy_enable, set_local_privacy_cback);
@@ -1041,6 +1048,10 @@ void btc_gap_ble_call_handler(btc_msg_t *msg)
         btc_ble_set_rand_addr(bd_addr, btc_set_rand_addr_callback);
         break;
     }
+    case BTC_GAP_BLE_ACT_CLEAR_RAND_ADDRESS: {
+        btc_ble_clear_rand_addr();
+        break;
+    }
     case BTC_GAP_BLE_ACT_CONFIG_LOCAL_PRIVACY:
         btc_ble_config_local_privacy(arg->cfg_local_privacy.privacy_enable, btc_set_local_privacy_callback);
         break;
@@ -1112,6 +1123,25 @@ void btc_gap_ble_call_handler(btc_msg_t *msg)
                 uint8_t key_size = 0;
                 STREAM_TO_UINT8(key_size, value);
                 bta_dm_co_ble_set_max_key_size(key_size);
+                break;
+            }
+            case ESP_BLE_SM_SET_STATIC_PASSKEY: {
+                uint32_t passkey = 0;
+                for(uint8_t i = 0; i < arg->set_security_param.len; i++)
+                {
+                    passkey += (((uint8_t *)value)[i]<<(8*i));
+                }
+                BTA_DmBleSetStaticPasskey(true, passkey);
+                break;
+            }
+            case ESP_BLE_SM_CLEAR_STATIC_PASSKEY: {
+                BTA_DmBleSetStaticPasskey(false, 0);
+                break;
+            }
+            case ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH: {
+                uint8_t enable = 0;
+                STREAM_TO_UINT8(enable, value);
+                bta_dm_co_ble_set_accept_auth_enable(enable);
                 break;
             }
             default:

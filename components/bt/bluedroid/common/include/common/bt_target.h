@@ -52,6 +52,7 @@
 #define BTA_SDP_INCLUDED            TRUE
 #define BTA_DM_PM_INCLUDED          TRUE
 #define SDP_INCLUDED                TRUE
+#define BT_SSP_INCLUDED             TRUE
 
 #if CONFIG_A2DP_ENABLE
 #define BTA_AR_INCLUDED             TRUE
@@ -128,12 +129,6 @@
 #define SMP_INCLUDED              FALSE
 #define BLE_PRIVACY_SPT           FALSE
 #endif  /* CONFIG_SMP_ENABLE */
-
-#if (CONFIG_BT_SSP_ENABLE)
-#define BT_SSP_INCLUDED              TRUE
-#else
-#define BT_SSP_INCLUDED              FALSE
-#endif  /* CONFIG_BT_SSP_ENABLE */
 
 #if (CONFIG_BT_ACL_CONNECTIONS)
 #define MAX_ACL_CONNECTIONS  CONFIG_BT_ACL_CONNECTIONS
@@ -321,6 +316,12 @@
 #define SCAN_QUEUE_CONGEST_CHECK  FALSE
 #else
 #define SCAN_QUEUE_CONGEST_CHECK  CONFIG_BLE_HOST_QUEUE_CONGESTION_CHECK
+#endif
+
+#ifndef CONFIG_GATTS_SEND_SERVICE_CHANGE_MODE
+#define GATTS_SEND_SERVICE_CHANGE_MODE GATTS_SEND_SERVICE_CHANGE_AUTO
+#else
+#define GATTS_SEND_SERVICE_CHANGE_MODE CONFIG_GATTS_SEND_SERVICE_CHANGE_MODE
 #endif
 
 /* This feature is used to eanble interleaved scan*/
@@ -997,7 +998,7 @@
 #endif
 
 #ifndef BTM_BLE_ADV_TX_POWER
-#define BTM_BLE_ADV_TX_POWER {-21, -15, -7, 1, 9}
+#define BTM_BLE_ADV_TX_POWER {-12, -9, -6, -3, 0, 3, 6, 9}
 #endif
 
 

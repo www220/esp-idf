@@ -765,6 +765,7 @@ typedef struct {
     UINT8           fail_reason;        /* The HCI reason/error code for when success=FALSE */
     tBLE_ADDR_TYPE  addr_type;          /* Peer device address type */
     tBT_DEVICE_TYPE dev_type;
+    UINT8           auth_mode;
 } tBTA_DM_AUTH_CMPL;
 
 
@@ -1572,6 +1573,18 @@ extern void BTA_DmBondCancel(BD_ADDR bd_addr);
 
 /*******************************************************************************
 **
+** Function         BTA_DMSetPinType
+**
+** Description      This function sets pin type as BTM_PIN_TYPE_FIXED or BTM_PIN_TYPE_VARIABLE
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+extern void BTA_DMSetPinType (UINT8 pin_type, UINT8 *pin_code, UINT8 pin_code_len);
+
+/*******************************************************************************
+**
 ** Function         BTA_DmPinReply
 **
 ** Description      This function provides a PIN when one is requested by DM
@@ -1811,6 +1824,22 @@ extern void BTA_DmBleSetBgConnType(tBTA_DM_BLE_CONN_TYPE bg_conn_type, tBTA_DM_B
 **
 *******************************************************************************/
 extern void BTA_DmBlePasskeyReply(BD_ADDR bd_addr, BOOLEAN accept, UINT32 passkey);
+
+/*******************************************************************************
+**
+** Function         BTA_DmBleSetStaticPasskey
+**
+** Description      Set BLE SMP static passkey.
+**
+** Parameters:      add              - add static passkey when add is true
+**                                     clear static passkey when add is false
+**                  passkey          - static passkey value
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+extern void BTA_DmBleSetStaticPasskey(bool add, uint32_t passkey);
 
 /*******************************************************************************
 **
@@ -2093,6 +2122,7 @@ extern void BTA_DmBleScan(BOOLEAN start, UINT32 duration,
 extern void BTA_DmBleStopAdvertising(void);
 
 extern void BTA_DmSetRandAddress(BD_ADDR rand_addr, tBTA_SET_RAND_ADDR_CBACK *p_set_rand_addr_cback);
+extern void BTA_DmClearRandAddress(void);
 
 #endif
 

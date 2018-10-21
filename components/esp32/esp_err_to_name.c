@@ -125,11 +125,11 @@ static const esp_err_msg_t esp_err_msg_table[] = {
     ERR_TBL_IT(ESP_ERR_NVS_INVALID_HANDLE),                 /*  4359 0x1107 Handle has been closed or is NULL */
 #   endif
 #   ifdef      ESP_ERR_NVS_REMOVE_FAILED
-    ERR_TBL_IT(ESP_ERR_NVS_REMOVE_FAILED),                  /*  4360 0x1108 The value wasn’t updated because flash
-                                                                            write operation has failed. The value was
-                                                                            written however, and update will be finished
-                                                                            after re-initialization of nvs, provided
-                                                                            that flash operation doesn’t fail again. */
+    ERR_TBL_IT(ESP_ERR_NVS_REMOVE_FAILED),                  /*  4360 0x1108 The value wasn’t updated because flash write
+                                                                            operation has failed. The value was written
+                                                                            however, and update will be finished after
+                                                                            re-initialization of nvs, provided that
+                                                                            flash operation doesn’t fail again. */
 #   endif
 #   ifdef      ESP_ERR_NVS_KEY_TOO_LONG
     ERR_TBL_IT(ESP_ERR_NVS_KEY_TOO_LONG),                   /*  4361 0x1109 Key name is too long */
@@ -165,6 +165,27 @@ static const esp_err_msg_t esp_err_msg_table[] = {
     ERR_TBL_IT(ESP_ERR_NVS_NEW_VERSION_FOUND),              /*  4368 0x1110 NVS partition contains data in new format
                                                                             and cannot be recognized by this version of
                                                                             code */
+#   endif
+#   ifdef      ESP_ERR_NVS_XTS_ENCR_FAILED
+    ERR_TBL_IT(ESP_ERR_NVS_XTS_ENCR_FAILED),                /*  4369 0x1111 XTS encryption failed while writing NVS entry */
+#   endif
+#   ifdef      ESP_ERR_NVS_XTS_DECR_FAILED
+    ERR_TBL_IT(ESP_ERR_NVS_XTS_DECR_FAILED),                /*  4370 0x1112 XTS decryption failed while reading NVS entry */
+#   endif
+#   ifdef      ESP_ERR_NVS_XTS_CFG_FAILED
+    ERR_TBL_IT(ESP_ERR_NVS_XTS_CFG_FAILED),                 /*  4371 0x1113 XTS configuration setting failed */
+#   endif
+#   ifdef      ESP_ERR_NVS_XTS_CFG_NOT_FOUND
+    ERR_TBL_IT(ESP_ERR_NVS_XTS_CFG_NOT_FOUND),              /*  4372 0x1114 XTS configuration not found */
+#   endif
+#   ifdef      ESP_ERR_NVS_ENCR_NOT_SUPPORTED
+    ERR_TBL_IT(ESP_ERR_NVS_ENCR_NOT_SUPPORTED),             /*  4373 0x1115 NVS encryption is not supported in this version */
+#   endif
+#   ifdef      ESP_ERR_NVS_KEYS_NOT_INITIALIZED
+    ERR_TBL_IT(ESP_ERR_NVS_KEYS_NOT_INITIALIZED),           /*  4374 0x1116 NVS key partition is uninitialized */
+#   endif
+#   ifdef      ESP_ERR_NVS_CORRUPT_KEY_PART
+    ERR_TBL_IT(ESP_ERR_NVS_CORRUPT_KEY_PART),               /*  4375 0x1117 NVS key partition is corrupt */
 #   endif
     // components/ulp/include/esp32/ulp.h
 #   ifdef      ESP_ERR_ULP_BASE
@@ -399,7 +420,7 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   ifdef      ESP_ERR_TCPIP_ADAPTER_DHCP_NOT_STOPPED
     ERR_TBL_IT(ESP_ERR_TCPIP_ADAPTER_DHCP_NOT_STOPPED),     /* 20487 0x5007 */
 #   endif
-    // components/lwip/apps/ping/esp_ping.h
+    // components/lwip/include/apps/esp_ping.h
 #   ifdef      ESP_ERR_PING_BASE
     ERR_TBL_IT(ESP_ERR_PING_BASE),                          /* 24576 0x6000 */
 #   endif
@@ -428,6 +449,12 @@ static const esp_err_msg_t esp_err_msg_table[] = {
 #   ifdef      ESP_ERR_HTTP_INVALID_TRANSPORT
     ERR_TBL_IT(ESP_ERR_HTTP_INVALID_TRANSPORT),             /* 28677 0x7005 There are no transport support for the input
                                                                             scheme */
+#   endif
+#   ifdef      ESP_ERR_HTTP_CONNECTING
+    ERR_TBL_IT(ESP_ERR_HTTP_CONNECTING),                    /* 28678 0x7006 HTTP connection hasn't been established yet */
+#   endif
+#   ifdef      ESP_ERR_HTTP_EAGAIN
+    ERR_TBL_IT(ESP_ERR_HTTP_EAGAIN),                        /* 28679 0x7007 Mapping of errno EAGAIN to esp_err_t */
 #   endif
     // components/http_server/include/http_server.h
 #   ifdef      ESP_ERR_HTTPD_BASE
