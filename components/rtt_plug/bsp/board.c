@@ -1125,6 +1125,40 @@ int pin_val(int argc, char **argv)
     return 0;
 }
 
+int convbuf(char *buf)
+{
+    char ch = 0,ch2 = 0;
+    char *base, *conv;
+    base = conv = buf;
+    while ('\0' != (ch = *buf++)) 
+    {
+        if ('\\' == ch) {
+            if ('\0' == (ch = *buf++)) break;
+            if ('n' == ch)
+                *conv++ = '\n';
+            else if ('r' == ch)
+                *conv++ = '\r';
+            else if ('t' == ch)
+                *conv++ = '\t';
+            else if ('"' == ch)
+                *conv++ = '\"';
+            else if ('\'' == ch)
+                *conv++ = '\'';
+            else if ('\\' == ch)
+                *conv++ = '\\';
+            else if ('x' == ch){
+                if ('\0' == (ch = *buf++)) break;
+                if ('\0' == (ch2 = *buf++)) break;
+                *conv++ = ((ch>='a')?(ch-'a'+0xa):(ch-'0'))*0x10+((ch2>='a')?(ch2-'a'+0xa):(ch2-'0'));
+            }
+        } else {
+            *conv++ = ch;
+        }
+    }
+    *conv++ = '\0';
+    return conv - base - 1;
+}
+
 int uart_test(int argc, char **argv)
 {
     int i,j;
@@ -1149,13 +1183,14 @@ int uart_test(int argc, char **argv)
         rt_device_open(dev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
         openflag = 1;
     }
+    int buflen = convbuf(argv[2]);
     if (argc > 3) count = atoi(argv[3]);
     for (i=0; i<count; i++)
     {
         int recvflag = 0;
-        rt_kprintf("send:%s\r\n", argv[2]);
-        rt_device_write_485(dev, 0, argv[2], strlen(argv[2]));
-        rt_kprintf("read:");
+        rt_kprintf("send:[%s]\r\n", argv[2]);
+        rt_device_write_485(dev, 0, argv[2], buflen);
+        rt_kprintf("read:[");
         for (j=0; j<10; j++)
         {
             int len = rt_device_read(dev, 0, chbuf, 99);
@@ -1167,7 +1202,7 @@ int uart_test(int argc, char **argv)
             }
             rt_thread_delay(100);
         }
-        rt_kprintf("%s\r\n",(recvflag==0)?"timeout...":"");
+        rt_kprintf("%s]\r\n",(recvflag==0)?"timeout...":"");
     }
     if (openflag)
     {
