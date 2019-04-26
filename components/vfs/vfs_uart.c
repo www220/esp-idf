@@ -251,6 +251,22 @@ static ssize_t uart_read(int fd, void* data, size_t size)
     return -1;
 }
 
+#if 1
+#include <rtthread.h>
+static ssize_t uart_write_rtt(int fd, const void * data, size_t size)
+{
+    rt_device_t dev = rt_console_get_device();
+    if (dev == NULL) return uart_write(fd, data, size);
+    return rt_device_write(dev, 0, data, size);
+}
+static ssize_t uart_read_rtt(int fd, void* data, size_t size)
+{
+    rt_device_t dev = rt_console_get_device();
+    if (dev == NULL) return uart_read(fd, data, size);
+    return rt_device_read(dev, 0, data, size);
+}
+#endif
+
 static int uart_fstat(int fd, struct stat * st)
 {
     assert(fd >=0 && fd < 3);
@@ -888,11 +904,11 @@ void esp_vfs_dev_uart_register()
 {
     esp_vfs_t vfs = {
         .flags = ESP_VFS_FLAG_DEFAULT,
-        .write = &uart_write,
+        .write = &uart_write_rtt,
         .open = &uart_open,
         .fstat = &uart_fstat,
         .close = &uart_close,
-        .read = &uart_read,
+        .read = &uart_read_rtt,
         .fcntl = &uart_fcntl,
         .access = &uart_access,
         .start_select = &uart_start_select,
