@@ -364,6 +364,10 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stdout = (FILE*) &__sf_fake_stdout;
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
+#if 1
+    extern void rtthread_startup(void);
+    rtthread_startup();
+#endif
     esp_timer_init();
     esp_set_time_from_rtc();
 #if CONFIG_ESP32_APPTRACE_ENABLE

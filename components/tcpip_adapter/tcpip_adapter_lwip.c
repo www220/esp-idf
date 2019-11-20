@@ -151,15 +151,31 @@ static int tcpip_adapter_ipc_check(tcpip_adapter_api_msg_t *msg)
 #endif
 }
 
-static esp_err_t tcpip_adapter_update_default_netif(void)
+#define ADAPTER_LEVEL_MAX 10
+char tcpip_adapter_level[ADAPTER_LEVEL_MAX] = {2,4,3,1};
+esp_err_t tcpip_adapter_update_default_netif(void)
 {
-    if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_STA])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_STA]);
-    } else if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_ETH])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_ETH]);
-    } else if (netif_is_up(esp_netif[TCPIP_ADAPTER_IF_AP])) {
-        netif_set_default(esp_netif[TCPIP_ADAPTER_IF_AP]);
+    int i,netif_level = ADAPTER_LEVEL_MAX;
+    struct netif *netif = NULL,*netif_tmp = NULL;
+
+    for (netif_tmp = netif_list; netif_tmp != NULL; netif_tmp = netif_tmp->next) {
+        if (!netif_is_up(netif_tmp)) continue;
+        ip4_addr_t addr = *netif_ip4_gw(netif_tmp);
+        if (addr.addr == IPADDR_NONE || addr.addr == IPADDR_ANY) continue;
+        for (i=0; i<=TCPIP_ADAPTER_IF_MAX; i++){
+            if (i == TCPIP_ADAPTER_IF_MAX) {
+                if (netif_tmp->name[0]!='p' || netif_tmp->name[1]!='p') continue;
+            }else if (netif_tmp != esp_netif[i]) {
+                continue;
+            }
+            if (0 < tcpip_adapter_level[i] && tcpip_adapter_level[i] < netif_level){
+                netif = netif_tmp;
+                netif_level = tcpip_adapter_level[i];
+            }
+        }
     }
+
+    netif_set_default(netif);
 
     return ESP_OK;
 }
