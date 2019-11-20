@@ -159,7 +159,7 @@ static rt_err_t esp32_configure(struct rt_serial_device *serial, struct serial_c
     SET_PERI_REG_MASK(UART_CONF0_REG(uart_num), UART_INVERSE_DISABLE);
     //
 	UART[uart_num]->conf1.rx_flow_thrhd = UART_FULL_THRESH_DEFAULT;
-    if(cfg->reserved & UART_HW_FLOWCTRL_RTS || uart_num == 2)
+    if(cfg->reserved & UART_HW_FLOWCTRL_RTS)
         UART[uart_num]->conf1.rx_flow_en = 1;
     else
         UART[uart_num]->conf1.rx_flow_en = 0;
@@ -376,7 +376,6 @@ void rt_hw_usart_init()
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_2)) rtc_gpio_deinit(GPIO_NUM_2);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_18)) rtc_gpio_deinit(GPIO_NUM_18);
 	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_0)) rtc_gpio_deinit(GPIO_NUM_0);
-	if(RTC_GPIO_IS_VALID_GPIO(GPIO_NUM_17)) rtc_gpio_deinit(GPIO_NUM_17);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_2], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_2, GPIO_PULLUP_ONLY);
 	gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
@@ -387,12 +386,9 @@ void rt_hw_usart_init()
 	gpio_matrix_in(GPIO_NUM_18, U2RXD_IN_IDX, 0);
 	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_0], PIN_FUNC_GPIO);
 	gpio_set_pull_mode(GPIO_NUM_0, GPIO_PULLUP_ONLY);
+	gpio_set_level(GPIO_NUM_0, 0);
 	gpio_set_direction(GPIO_NUM_0, GPIO_MODE_OUTPUT);
-	gpio_matrix_out(GPIO_NUM_0, U2RTS_OUT_IDX, 0, 0);
-	PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[GPIO_NUM_17], PIN_FUNC_GPIO);
-	gpio_set_pull_mode(GPIO_NUM_17, GPIO_PULLUP_ONLY);
-	gpio_set_direction(GPIO_NUM_17, GPIO_MODE_INPUT);
-	gpio_matrix_in(GPIO_NUM_17, U2CTS_IN_IDX, 0);
+	gpio_matrix_out(GPIO_NUM_0, SIG_GPIO_OUT_IDX, 0, 0);
 
     intr_matrix_set(xPortGetCoreID(), ETS_UART2_INTR_SOURCE, uart2.irq);
     xt_set_interrupt_handler(uart2.irq, uart_rx_intr_handler_default, &serial2);
@@ -426,6 +422,13 @@ rt_size_t rt_device_write_485(rt_device_t dev, rt_off_t pos, const void *buffer,
 		while (UART[uart_num]->status.txfifo_cnt);
 		uart_tx_wait_idle(uart_num);
 		gpio_set_level(GPIO_NUM_5, 0);
+    	return ret;
+	}else if (uart_num == 2){
+		gpio_set_level(GPIO_NUM_0, 1);
+		int ret = rt_device_write(dev, pos, buffer, size);
+		while (UART[uart_num]->status.txfifo_cnt);
+		uart_tx_wait_idle(uart_num);
+		gpio_set_level(GPIO_NUM_0, 0);
     	return ret;
 	}else{
     	return rt_device_write(dev, pos, buffer, size);
