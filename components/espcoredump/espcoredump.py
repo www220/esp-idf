@@ -1028,7 +1028,7 @@ def info_corefile(args):
                     # merged: |XXXXXXXXXXXXXXXXX|
                     seg_len = len(ps.data)
                 merged_segs.append((s.name, seg_addr, seg_len, s.attr_str(), True))
-                core_segs.remove(ps)
+                # core_segs.remove(ps)
                 merged = True
             elif ps.addr >= s.addr and ps.addr <= s.addr + len(s.data):
                 # sec:  |XXXXXXXXXX|
@@ -1045,7 +1045,7 @@ def info_corefile(args):
                     # merged: |XXXXXXXXXX|
                     seg_len = len(s.data)
                 merged_segs.append((s.name, seg_addr, seg_len, s.attr_str(), True))
-                core_segs.remove(ps)
+                # core_segs.remove(ps)
                 merged = True
 
         if not merged:
@@ -1064,7 +1064,7 @@ def info_corefile(args):
     print("\n================== CURRENT THREAD REGISTERS ===================")
     p = gdbmi_getinfo(p, handlers, "info registers")
     print("\n==================== CURRENT THREAD STACK =====================")
-    p = gdbmi_getinfo(p, handlers, "bt")
+    p = gdbmi_getinfo(p, handlers, "thread apply all bt")
     print("\n======================== THREADS INFO =========================")
     p = gdbmi_getinfo(p, handlers, "info threads")
     print("\n======================= ALL MEMORY REGIONS ========================")

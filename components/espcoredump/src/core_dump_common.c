@@ -61,6 +61,7 @@ static esp_err_t esp_core_dump_write_binary(void *frame, core_dump_write_config_
             data_len += len;
         } else {
             // If task tcb is ok but stack is corrupted
+            data_len -= (tcb_sz_padded + sizeof(core_dump_task_header_t));
             write_cfg->bad_tasks_num++;
         }
     }
@@ -192,6 +193,11 @@ esp_err_t esp_core_dump_image_get(size_t* out_addr, size_t *out_size)
     uint32_t *dw = (uint32_t *)core_data;
     *out_size = *dw;
     spi_flash_munmap(core_data_handle);
+
+    if (*out_size == 0xffffffff){
+        ESP_LOGI(TAG, "No core dump data found.");
+        return ESP_FAIL;
+    }
 
     // remap full core dump with CRC
     err = esp_partition_mmap(core_part, 0, *out_size,

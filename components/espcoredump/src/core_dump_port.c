@@ -80,18 +80,22 @@ bool esp_core_dump_process_stack(core_dump_task_header_t* task_snaphort, uint32_
     len = (uint32_t)task_snaphort->stack_end - (uint32_t)task_snaphort->stack_start;
     // Check task's stack
     if (!esp_stack_ptr_is_sane(task_snaphort->stack_start) ||
-        !esp_task_stack_start_is_sane((uint32_t)task_snaphort->stack_end) ||
-        (len > COREDUMP_MAX_TASK_STACK_SIZE)) {
+        !esp_task_stack_start_is_sane((uint32_t)task_snaphort->stack_end)) {
         // Check if current task stack corrupted
         if (task_snaphort->tcb_addr == xTaskGetCurrentTaskHandleForCPU(xPortGetCoreID())) {
-            ESP_COREDUMP_LOG_PROCESS("Crashed task will be skipped!");
+            ESP_COREDUMP_LOGE("Crashed task will be skipped!");
         }
-        ESP_COREDUMP_LOG_PROCESS("Corrupted TCB %x: stack len %lu, top %x, end %x!",
+        ESP_COREDUMP_LOGE("Corrupted TCB %x: stack len %lu, top %x, end %x!",
             task_snaphort->tcb_addr, len, task_snaphort->stack_start, task_snaphort->stack_end);
         task_snaphort->tcb_addr = 0; // make TCB addr invalid to skip it in dump
         task_is_valid = false;
     } else {
-        ESP_COREDUMP_LOG_PROCESS("Stack len = %lu (%x %x)", len,
+        // Limit stack size <= COREDUMP_MAX_TASK_STACK_SIZE
+        if (len > COREDUMP_MAX_TASK_STACK_SIZE){
+            task_snaphort->stack_end = task_snaphort->stack_start + COREDUMP_MAX_TASK_STACK_SIZE;
+            len = COREDUMP_MAX_TASK_STACK_SIZE;
+        }
+        ESP_COREDUMP_LOGI("Stack len = %lu (%x %x)", len,
                 task_snaphort->stack_start, task_snaphort->stack_end);
         // Take stack padding into account
         *length = (len + sizeof(uint32_t) - 1) & ~(sizeof(uint32_t) - 1);

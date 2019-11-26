@@ -32,7 +32,7 @@
 #define ESP_COREDUMP_LOG_PROCESS( format, ... )  do{/*(__VA_ARGS__);*/}while(0)
 #endif
 
-#define COREDUMP_MAX_TASK_STACK_SIZE        (64*1024)
+#define COREDUMP_MAX_TASK_STACK_SIZE        4096
 #define COREDUMP_VERSION                    1
 
 typedef uint32_t core_dump_crc_t;
