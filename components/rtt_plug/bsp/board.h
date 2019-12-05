@@ -40,6 +40,8 @@
 void rt_hw_board_init(void);
 int rt_hw_eth_init(void);
 int rt_hw_telnet_init(void);
+void rt_hw_putc_init(int type);
+void rt_hw_console_putc(char c);
 
 #define PZ_SKIPPRJ      0
 #define PZ_WAIT         1
@@ -57,6 +59,7 @@ extern char RTT_USER[16];
 extern char RTT_PASS[36];
 extern char RTT_NTP[32];
 extern unsigned long long RTT_PRJNO;
+extern unsigned int RTT_DNS;
 
 #define rttIoScanDir "/spi/ioscan"
 #define rttLogDir "/spi/log"

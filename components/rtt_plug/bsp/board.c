@@ -885,8 +885,16 @@ char RTT_USER[16] = {"admin"};
 char RTT_PASS[36] = {"21232f297a57a5a743894a0e4a801fc3"};
 char RTT_NTP[32] = {"www.baidu.com"};
 unsigned long long RTT_PRJNO = 0;
+unsigned int RTT_DNS = 0x72727272;
 
-static void rt_hw_write_char(char c)
+int finsh_idx = 0;
+extern char finsh_thread_stack[FINSH_THREAD_STACK_SIZE];
+void rt_hw_console_putc(char c)
+{
+    finsh_thread_stack[finsh_idx] = c;
+    if (++finsh_idx >= FINSH_THREAD_STACK_SIZE) finsh_idx = 0;
+}
+static void rt_hw_console_outc(char c)
 {
     rt_device_t dev = rt_console_get_device();
     if (dev == NULL)
@@ -894,6 +902,27 @@ static void rt_hw_write_char(char c)
     else
         rt_device_write(dev, 0, &c, 1);
 }
+void rt_hw_console_output(const char *str)
+{
+    char c = 0;
+    while ((c = *str++)) rt_hw_console_putc(c);
+}
+void rt_hw_putc_init(int type)
+{
+    if (type == 0){
+        ets_install_putc1(rt_hw_console_putc);
+        ets_install_putc2(NULL);
+    }else if (type == 1){
+        ets_install_putc1(rt_hw_console_outc);
+        ets_install_putc2(NULL);
+        rt_device_t dev = rt_console_get_device();
+        if (dev != NULL && finsh_idx > 0){
+            rt_device_write(dev, 0, finsh_thread_stack, finsh_idx);
+            finsh_idx = 0;
+        }
+    }
+}
+
 void rt_hw_board_init(void)
 {
 	/* initialize led gpio */
@@ -910,11 +939,7 @@ void rt_hw_board_init(void)
 	gpio_set_direction(GPIO_NUM_35, GPIO_MODE_INPUT);
     /* initialize uart */
     rt_hw_usart_init();
-#ifdef RT_USING_CONSOLE
-    rt_console_set_device(CONSOLE_DEVICE);
-#endif
-    ets_install_putc1(rt_hw_write_char);
-    ets_install_putc2(NULL);
+
 	/* initialize i2c */
     rt_hw_i2c_init();
 

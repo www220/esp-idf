@@ -178,6 +178,11 @@ void IRAM_ATTR call_start_cpu0()
     bootloader_common_set_flash_cs_timing();
 #endif
 
+#if 1
+    extern void rt_hw_putc_init(int);
+    rt_hw_putc_init(0);
+#endif
+
     ESP_EARLY_LOGI(TAG, "Pro cpu up.");
     if (LOG_LOCAL_LEVEL >= ESP_LOG_INFO) {
         const esp_app_desc_t *app_desc = esp_ota_get_app_description();

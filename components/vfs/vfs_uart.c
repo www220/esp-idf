@@ -257,7 +257,17 @@ static ssize_t uart_read(int fd, void* data, size_t size)
 static ssize_t uart_write_rtt(int fd, const void * data, size_t size)
 {
     rt_device_t dev = rt_console_get_device();
-    if (dev == NULL) return uart_write(fd, data, size);
+    if (dev == NULL) {
+        if (fd > 2) return uart_write(fd, data, size);
+        size_t send = 0;
+        char *buf = (char *)data;
+        while (send < size){
+            extern void rt_hw_console_putc(char);
+            rt_hw_console_putc(buf[send]);
+            send++;
+        }
+        return send;
+    }
     return rt_device_write(dev, 0, data, size);
 }
 static ssize_t uart_read_rtt(int fd, void* data, size_t size)

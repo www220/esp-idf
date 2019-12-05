@@ -52,7 +52,7 @@
 /* finsh thread */
 static struct rt_thread finsh_thread;
 ALIGN(RT_ALIGN_SIZE)
-static char finsh_thread_stack[FINSH_THREAD_STACK_SIZE];
+char finsh_thread_stack[FINSH_THREAD_STACK_SIZE];
 struct finsh_shell *shell;
 
 #if defined(FINSH_USING_MSH) || (defined(RT_USING_DFS) && defined(DFS_USING_WORKDIR))
