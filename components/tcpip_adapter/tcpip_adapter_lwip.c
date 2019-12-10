@@ -151,11 +151,10 @@ static int tcpip_adapter_ipc_check(tcpip_adapter_api_msg_t *msg)
 #endif
 }
 
-#define ADAPTER_LEVEL_MAX 10
-char tcpip_adapter_level[ADAPTER_LEVEL_MAX] = {2,4,3,1};
+char tcpip_adapter_level[TCPIP_ADAPTER_IF_MAX+1] = {2,0,3,1};
 esp_err_t tcpip_adapter_update_default_netif(void)
 {
-    int i,netif_level = ADAPTER_LEVEL_MAX;
+    int i,netif_level = 1000;
     struct netif *netif = NULL,*netif_tmp = NULL;
 
     for (netif_tmp = netif_list; netif_tmp != NULL; netif_tmp = netif_tmp->next) {

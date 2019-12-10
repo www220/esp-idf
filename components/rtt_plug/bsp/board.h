@@ -60,6 +60,7 @@ extern char RTT_PASS[36];
 extern char RTT_NTP[32];
 extern unsigned long long RTT_PRJNO;
 extern unsigned int RTT_DNS;
+extern char tcpip_adapter_level[4];
 
 #define rttIoScanDir "/spi/ioscan"
 #define rttLogDir "/spi/log"
