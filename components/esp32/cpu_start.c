@@ -47,7 +47,6 @@
 #include "nvs_flash.h"
 #include "esp_event.h"
 #include "esp_spi_flash.h"
-#include "esp_ipc.h"
 #include "esp_crosscore_int.h"
 #include "esp_dport_access.h"
 #include "esp_log.h"
@@ -69,10 +68,11 @@
 #include "esp_clk_internal.h"
 #include "esp_timer.h"
 #include "esp_pm.h"
+#include "esp_flash_encrypt.h"
 #include "pm_impl.h"
 #include "trax.h"
 #include "esp_ota_ops.h"
-#include "bootloader_common.h"
+#include "bootloader_flash_config.h"
 
 #define STRINGIFY(s) STRINGIFY2(s)
 #define STRINGIFY2(s) #s
@@ -174,8 +174,6 @@ void IRAM_ATTR call_start_cpu0()
         abort();
 #endif
     }
-# else  // If psram is uninitialized, we need to improve the flash cs timing.
-    bootloader_common_set_flash_cs_timing();
 #endif
 
 #if 1
@@ -356,6 +354,11 @@ void start_cpu0_default(void)
 #if CONFIG_DISABLE_BASIC_ROM_CONSOLE
     esp_efuse_disable_basic_rom_console();
 #endif
+#ifdef CONFIG_FLASH_ENCRYPTION_DISABLE_PLAINTEXT
+    if (esp_flash_encryption_enabled()) {
+        esp_flash_write_protect_crypt_cnt();
+    }
+#endif
     rtc_gpio_force_hold_dis_all();
     esp_vfs_dev_uart_register();
     esp_reent_init(_GLOBAL_REENT);
@@ -403,15 +406,6 @@ void start_cpu0_default(void)
     /* init default OS-aware flash access critical section */
     spi_flash_guard_set(&g_flash_guard_default_ops);
 
-    uint8_t revision = esp_efuse_get_chip_ver();
-    ESP_LOGI(TAG, "Chip Revision: %d", revision);
-    if (revision > CONFIG_ESP32_REV_MIN) {
-        ESP_LOGW(TAG, "Chip revision is higher than the one configured in menuconfig. Suggest to upgrade it.");
-    } else if(revision != CONFIG_ESP32_REV_MIN) {
-        ESP_LOGE(TAG, "ESP-IDF can't support this chip revision. Modify minimum supported revision in menuconfig");
-        abort();
-    }
-
 #ifdef CONFIG_PM_ENABLE
     esp_pm_impl_init();
 #ifdef CONFIG_PM_DFS_INIT_AUTO
@@ -435,6 +429,21 @@ void start_cpu0_default(void)
 
 #if CONFIG_SW_COEXIST_ENABLE
     esp_coex_adapter_register(&g_coex_adapter_funcs);
+    coex_pre_init();
+#endif
+
+    bootloader_flash_update_id();
+#if !CONFIG_SPIRAM_BOOT_INIT
+    // Read the application binary image header. This will also decrypt the header if the image is encrypted.
+    esp_image_header_t fhdr = {0};
+    // This assumes that DROM is the first segment in the application binary, i.e. that we can read
+    // the binary header through cache by accessing SOC_DROM_LOW address.
+    memcpy(&fhdr, (void*) SOC_DROM_LOW, sizeof(fhdr));
+    // If psram is uninitialized, we need to improve some flash configuration.
+    bootloader_flash_clock_config(&fhdr);
+    bootloader_flash_gpio_config(&fhdr);
+    bootloader_flash_dummy_config(&fhdr);
+    bootloader_flash_cs_timing_config();
 #endif
 
     portBASE_TYPE res = xTaskCreatePinnedToCore(&main_task, "main",
