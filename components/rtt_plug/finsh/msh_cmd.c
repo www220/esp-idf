@@ -327,10 +327,10 @@ int cmd_dns(int argc, char **argv)
     if (argc == 1)
     {
         int index;
-        ip_addr_t addr, *ip_addr = &addr;
+        const ip_addr_t *ip_addr;
         for(index=0; index<DNS_MAX_SERVERS; index++)
         {
-            addr = dns_getserver(index);
+            ip_addr = dns_getserver(index);
             rt_kprintf("dns server #%d: %s\n", index, ipaddr_ntoa(ip_addr));
         }
     }
