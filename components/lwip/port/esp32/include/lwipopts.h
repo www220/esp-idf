@@ -293,6 +293,9 @@
 #define DNS_MAX_SERVERS                 3
 #define DNS_FALLBACK_SERVER_INDEX        (DNS_MAX_SERVERS - 1)
 
+#define LWIP_DHCP_MAX_DNS_SERVERS       0
+#define LWIP_DHCP6_MAX_DNS_SERVERS      0
+
 /*
    ---------------------------------
    ---------- UDP options ----------
@@ -664,7 +667,7 @@
  * LWIP_ND6_RDNSS_MAX_DNS_SERVERS: Allow IPv6 DNS servers to be retrieved from
  * NDP, up to the maximum number of allowed DNS servers (minus fallback slot)
  */
-#define LWIP_ND6_RDNSS_MAX_DNS_SERVERS  DNS_MAX_SERVERS
+#define LWIP_ND6_RDNSS_MAX_DNS_SERVERS  0
 
 
 /*
