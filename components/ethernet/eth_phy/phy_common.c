@@ -59,10 +59,18 @@ void phy_mii_enable_flow_ctrl(void)
 
 bool phy_mii_check_link_status(void)
 {
+    static int check_delay = 0;
     if ((esp_eth_smi_read(MII_BASIC_MODE_STATUS_REG) & MII_LINK_STATUS)) {
+        if (check_delay != 5){
+            check_delay = 5;
+        }
         ESP_LOGD(TAG, "phy_mii_check_link_status(UP)");
         return true;
     } else {
+        if (check_delay > 0){
+            check_delay--;
+            return true;
+        }
         ESP_LOGD(TAG, "phy_mii_check_link_status(DOWN)");
         return false;
     }

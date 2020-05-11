@@ -243,6 +243,7 @@ static int send_packet_http(int sock, char *srv)
                     "Accept: */*\r\n"
                     "Connection: close\r\n\r\n",
                     srv);
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     len = send(sock,sendbuf,strlen(sendbuf),0);
     if (len != strlen(sendbuf))
     {
